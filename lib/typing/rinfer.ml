@@ -200,14 +200,16 @@ let rec dnf_size = function
 
 let simplify = normalize
 
-let print_derived_refinement_type hes constraints = 
+let print_derived_refinement_type is_dual_chc hes constraints =
   let rec gen_name_type_map constraints m = match constraints with
     | [] -> m
     | (id, args, body)::xs -> 
       m |> Rid.M.add id (args, body) |> gen_name_type_map xs
   in
-  let m = gen_name_type_map constraints Rid.M.empty in
-  let rec subst_ids map t = 
+  let m =
+    gen_name_type_map constraints Rid.M.empty
+    |> Rid.M.map (fun (args, fml) -> args, if is_dual_chc then Rtype.dual fml else fml) in
+   let rec subst_ids map t =
     match map with 
     | [] -> t
     | (src, dst):: xs -> 
@@ -302,31 +304,34 @@ let rec infer hes env top =
 
     if size > 1 then begin
       let dual = List.map Chc.dual constraints in
-      let simplified' = simplify dual in
-      let size_dual = dnf_size simplified' in
+      let simplified_dual = simplify dual in
+      let size_dual = dnf_size simplified_dual in
       Printf.printf "[Dual Size] %d\n" size_dual;
-      let size' = if size < size_dual then size else size_dual in
-      let target = if size < size_dual then simplified else simplified' in
+      let min_size = if size < size_dual then size else size_dual in
+      let target = if size < size_dual then simplified else simplified_dual in
+      let use_dual = size >= size_dual in
 
-      let target' = expand target in
+      (* let target' = expand target in
       print_string "remove or or\n";
-      print_constraints target';
+      print_constraints target'; *)
       (* 3. check satisfiability *)
       (* match call_solver_with_timer target' (Chc_solver.selected_solver 1) with
       | `Sat(x) -> `Sat(x)
       | `Fail -> failwith "hoge"
       | _ ->
         begin *)
-          if size > 1 && size_dual > 1 then (print_string "[Warning]Some definite clause has or-head\n";flush stdout)
+          if min_size > 1 then (print_string "[Warning]Some definite clause has or-head\n";flush stdout)
           else (print_string "easy\n"; flush stdout);
-          if size' > 1 then
-            call_solver_with_timer target Chc_solver.(`Fptprove)
+          if min_size > 1 then
+            (* if size > 1 /\ dual_size > 1 *)
+            use_dual, call_solver_with_timer target Chc_solver.(`Fptprove)
           else
-            try_intersection_type target size'
+            use_dual, try_intersection_type target min_size
         (* end *)
-    end else try_intersection_type simplified size
-  in 
-  let x = infer_main hes env top in
+    end else (* if size <= 1 *)
+      false, try_intersection_type simplified size
+  in
+  let is_dual_chc, x = infer_main hes env top in
   report_times ();
   match x with
   | `Sat(x) -> 
@@ -334,7 +339,7 @@ let rec infer hes env top =
         match x with 
         | Ok(x) -> 
           let open Rethfl_options in
-          let hes = print_derived_refinement_type hes x in
+          let hes = print_derived_refinement_type is_dual_chc hes x in
           if !Typing.show_refinement then
             print_hes hes
           else 
