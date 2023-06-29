@@ -184,10 +184,13 @@ module Fn = struct
   let neg i = -i
   let const x _ = x
 
+<<<<<<< HEAD
   let print ?(tag="") pp x =
     match tag with
     | "" -> Format.printf "@[%a@]@." pp x
     | _ -> Format.printf "%s: @[%a@]@." tag pp x
+=======
+>>>>>>> upstream/master
 
   let on injection g x y = g (injection x) (injection y)
 

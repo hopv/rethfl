@@ -382,6 +382,7 @@ let rec infer anno_env hes env top =
         let use_dual = size >= size_dual in
         let anno_env = if use_dual then dual_environment anno_env else anno_env in
 
+<<<<<<< HEAD
         (* let target' = expand target in
         print_string "remove or or\n";
         print_constraints target'; *)
@@ -444,6 +445,25 @@ let rec infer anno_env hes env top =
         false, try_intersection_type anno_env simplified true
       end
     end
+=======
+      let target' = expand target in
+      print_string "remove or or\n";
+      print_constraints target';
+      (* 3. check satisfiability *)
+      (* match call_solver_with_timer target' (Chc_solver.selected_solver 1) with
+      | `Sat(x) -> `Sat(x)
+      | `Fail -> failwith "hoge"
+      | _ ->
+        begin *)
+          if size > 1 && size_dual > 1 then (print_string "[Warning]Some definite clause has or-head\n";flush stdout)
+          else (print_string "easy\n"; flush stdout);
+          if size' > 1 then
+            call_solver_with_timer target Chc_solver.(`Fptprove)
+          else
+            try_intersection_type target size'
+        (* end *)
+    end else try_intersection_type simplified size
+>>>>>>> upstream/master
   in 
   let is_dual_chc, x = infer_main hes env top in
   report_times ();

@@ -9,6 +9,8 @@ def ds_iden(x):
         return x
     return '/'.join(l[-2:])
 
+def cmpkey(x):
+    return (ds_iden(x["file"]).split("/")[0], x["size"])
 
 def main():
     files = sys.argv[1:]
@@ -27,9 +29,10 @@ def main():
     fail = 0
     wrong_answers = []
     ca_time_sum = 0
+    data = sorted(data, key=cmpkey)
     for x in data:
         key = ds_iden(x['file'])
-        target = 'invalid' if key.endswith('-e.in') else 'valid'
+        target = 'invalid' if key.endswith('-e.in') or key.endswith('-e.ml.in') or key.endswith('-e.ml') else 'valid'
         ok = 1 if target == x['result'] else 0
         if ok == 1:
             ca += 1
@@ -50,7 +53,8 @@ def main():
     print(f"Correct Answer: {ca} / {size}")
     print(f"Wrong Answer  : {wa} / {size}")
     print(f"Fail          : {fail} / {size}")
-    print(f"Correct Answer Response speed(mean): {ca_time_sum / ca}")
+    if ca > 0:
+      print(f"Correct Answer Response speed(mean): {ca_time_sum / ca}")
 
     print('Wrong Answers')
     for key in wrong_answers:
