@@ -171,16 +171,18 @@ let infer_rule track (rule: hes_rule) env (chcs: (refinement, refinement) chc li
   Printf.printf "%s = " rule.var.name;
   print_formula rule.body;
   print_newline();
+  (* infer type of rule.body using env *)
   let (t, m) = infer_formula track rule.body env chcs [] in
+  (* generate constraint that inferred type `t` is subtype of var type *)
   let m = subtype t rule.var.ty m in
   print_string "[Result]\n";
   print_constraints m;
   m
  
-let rec infer_hes ?(track=false) (hes: hes) env (accum: (refinement, refinement) chc list): (refinement, refinement) chc list = match hes with
-  | [] -> accum
+let rec infer_hes ?(track=false) (hes: hes) env (accum_constraints: (refinement, refinement) chc list): (refinement, refinement) chc list = match hes with
+  | [] -> accum_constraints
   | rule::xs -> 
-    infer_rule track rule env accum |> infer_hes ~track:track xs env 
+    infer_rule track rule env accum_constraints |> infer_hes ~track:track xs env 
 
 let rec print_hes = function
   | [] -> ()
@@ -374,6 +376,19 @@ let print_env (env: Rtype.t IdMap.t) =
   ));
   print_string "[print_env:end]\n"
 
+let annotation = 
+  let var_n = Rethfl_syntax.Id.gen ~name:"n" `Int in
+  let var_s = Rethfl_syntax.Id.gen ~name:"s" `Int in
+  RArrow(RInt(RId var_n),
+    RArrow(* wp *)(
+      RArrow(* post *)(
+        RInt(RId var_s),
+        RBool(RPred(Formula.Le, [Arith.Var var_n; Arith.Var var_s]))
+      ),
+      RBool(RTrue)
+    )
+  )
+
 (* infer with annotations *)
 let infer_based_on_annottations hes (env: Rtype.t IdMap.t) top =
 
@@ -381,19 +396,7 @@ let infer_based_on_annottations hes (env: Rtype.t IdMap.t) top =
 
   let env = Rethfl_syntax.IdMap.mapi env ~f:(fun ~key:id ~data:rty -> (
     if id.name = "SUM"
-        then (
-          let var_n = Rethfl_syntax.Id.gen ~name:"n" `Int in
-          let var_s = Rethfl_syntax.Id.gen ~name:"s" `Int in
-          RArrow(RInt(RId var_n),
-            RArrow(* wp *)(
-              RArrow(* post *)(
-                RInt(RId var_s),
-                RBool(RPred(Formula.Le, [Arith.Var var_n; Arith.Var var_s]))
-              ),
-              RBool(RTrue)
-            )
-          )
-        )
+        then annotation
         else rty
   )) in
 
@@ -497,3 +500,125 @@ let infer_based_on_annottations hes (env: Rtype.t IdMap.t) top =
   | `Unsat -> `Unsat
   | `Fail -> `Fail
   | `Unknown -> `Unknown
+
+let check_annotation hes env top = 
+
+  (* specify type of SUM in env *)
+  print_env env;
+
+  let env = Rethfl_syntax.IdMap.mapi env ~f:(fun ~key:id ~data:rty -> (
+    if id.name = "SUM"
+        then annotation
+        else rty
+  )) in
+
+  print_env env;
+  (* END: specify type of SUM in env *)
+
+  let top = (List.find (fun x -> x.var.name = "SUM") hes).var in
+  let hes = List.map (fun x -> 
+    let open Rhflz in 
+      {x with body=Rhflz.translate_if x.body}) hes 
+  in
+
+  (* remove unrelated rules *)
+  let hes = List.filter (fun x -> x.var.name <> "MAIN_195" ) hes in
+
+  (* modify the expected type of SUM in hes *)
+  let hes = List.map (fun x -> 
+    if x.var.name = "SUM" then (
+      {x with var={x.var with ty=annotation}}
+    ) else x
+  ) hes in
+  (* END: modify the expected type of SUM in hes *)
+  let call_solver_with_timer hes solver = 
+    add_mesure_time "CHC Solver" @@ fun () ->
+    Chc_solver.check_sat hes solver
+  in
+  let check_feasibility chcs = 
+    (* 1. generate constraints by using predicates for tracking cex *)
+    let p = Chc_solver.get_unsat_proof chcs `Eldarica in
+    let open Disprove in
+    match disprove p hes env top with
+    | `Invalid -> `Unsat
+    | `Unknown -> `Unknown
+  in 
+  (* CHC Size is 1, then it is tractable *)
+  (* size: intersection type size *)
+  let rec try_intersection_type chcs size =
+    (* 
+      if sat then return Valid
+      if unsat then returns check_feasibility
+    *)
+    match call_solver_with_timer chcs (Chc_solver.selected_solver 1) with
+    | `Unsat when !Rethfl_options.Typing.no_disprove -> `Unknown
+    | `Unsat -> check_feasibility chcs     
+    | `Sat(x) -> `Sat(x)
+    | `Fail -> `Fail
+    | `Unknown -> `Unknown
+  and infer_main ?(size=1) hes env top = 
+    (* 1. generate constraints *)
+    print_hes hes;
+    let constraints = infer_hes hes env [] in
+    (*print_constraints constraints;*)
+    (* 2. optimize CHC (ECHC) *)
+    let constraints = List.map (fun chc -> 
+      {chc with head=translate_if chc.head}
+    ) constraints in
+
+    let simplified = simplify constraints in
+    let size = dnf_size simplified in
+    Printf.printf "[Size] %d\n" size;
+
+    if size > 1 then begin
+      (* この辺使ってなさそう、size<=1っぽい *)
+      let dual = List.map Chc.dual constraints in
+      let simplified_dual = simplify dual in
+      let size_dual = dnf_size simplified_dual in
+      Printf.printf "[Dual Size] %d\n" size_dual;
+      let min_size = if size < size_dual then size else size_dual in
+      let target = if size < size_dual then simplified else simplified_dual in
+      let use_dual = size >= size_dual in
+
+
+      let target' = expand target in
+      print_string "remove or or\n";
+      print_constraints target';
+      (* 3. check satisfiability *)
+      (* match call_solver_with_timer target' (Chc_solver.selected_solver 1) with
+      | `Sat(x) -> `Sat(x)
+      | `Fail -> failwith "hoge"
+      | _ ->
+        begin *)
+          if min_size > 1 then (print_string "[Warning]Some definite clause has or-head\n";flush stdout)
+          else (print_string "easy\n"; flush stdout);
+          if min_size > 1 then
+            (* if size > 1 /\ dual_size > 1 *)
+            use_dual, call_solver_with_timer target Chc_solver.(`Fptprove)
+          else
+            use_dual, try_intersection_type target min_size
+        (* end *)
+    end else (* if size <= 1 *)
+      false, try_intersection_type simplified size
+  in
+  let (is_dual_chc, x) = infer_main hes env top in
+  report_times ();
+  match x with
+  | `Sat(x) -> 
+      begin 
+        match x with 
+        | Ok(x) -> 
+          let open Rethfl_options in
+          let hes = print_derived_refinement_type is_dual_chc hes x in
+          if !Typing.show_refinement then
+            print_hes hes
+          else 
+            ()
+        | Error(s) -> Printf.printf "%s\n" s
+      end;
+      `Sat
+  | `Unsat -> `Unsat
+  | `Fail -> `Fail
+  | `Unknown -> `Unknown
+  
+  

@@ -53,6 +53,10 @@ let generate_rtemplate args = RTemplate(generate_id(), args)
 (* clone *)
 let rec clone_type_with_new_pred ints = function
   | RBool(RTemplate(_, _)) -> RBool(RTemplate(generate_id (), ints))
+  | RBool(_) -> begin
+      print_endline "[Info]: Replacing non-template refinement";
+      RBool(RTemplate(generate_id (), ints))
+    end
   | RArrow(RInt(RId(id)), y) ->
     RArrow(RInt(RId(id)), clone_type_with_new_pred (Arith.Var(id)::ints) y) 
   | RArrow(x, y) -> 
