@@ -8,3 +8,5 @@ _build
 **/*.status
 **/*.install
 TODO
+
+/_snapshots/
