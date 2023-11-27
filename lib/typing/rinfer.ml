@@ -376,7 +376,10 @@ let print_env (env: Rtype.t IdMap.t) =
   ));
   print_string "[print_env:end]\n"
 
-let annotation = 
+let main_func = "MAIN_500"
+let annotated_func = "INIT"
+
+let annotation_sum = 
   let var_n = Rethfl_syntax.Id.gen ~name:"n" `Int in
   let var_s = Rethfl_syntax.Id.gen ~name:"s" `Int in
   RArrow(RInt(RId var_n),
@@ -389,13 +392,57 @@ let annotation =
     )
   )
 
+let annotation =
+  let var_i = Rethfl_syntax.Id.gen ~name:"i" `Int in
+  let var_n = Rethfl_syntax.Id.gen ~name:"n" `Int in
+  let var_i_input = Rethfl_syntax.Id.gen ~name:"i_input" `Int in
+  let var_v_input = Rethfl_syntax.Id.gen ~name:"v_input" `Int in
+  let var_i_output = Rethfl_syntax.Id.gen ~name:"i_output" `Int in
+  let var_v_output = Rethfl_syntax.Id.gen ~name:"v_output" `Int in
+  RArrow(RInt(RId var_i), RArrow(RInt (RId var_n), RArrow(
+    (* a_input *)RArrow(RInt(RId var_i_input),
+      (* wp of a_input *)RArrow(
+        (* post of a_input *)RArrow(RInt(RId var_v_input), RBool(
+          ROr(
+            (* 0 <= i_a_input < i ==> *)ROr(
+              RPred(Formula.Lt, [Arith.Var var_i_input; Arith.Int 0]),
+              RPred(Formula.Le, [Arith.Var var_i; Arith.Var var_i_input])
+            ),
+            RPred(Formula.Eq, [Arith.Var var_v_input; Arith.Int 1])
+          )
+        )),
+        RBool(RTrue)
+      )
+    ),
+    (* wp *)RArrow(
+      (* post *)RArrow(
+        (* a_output *)RArrow(RInt(RId var_i_output),
+          (* wp of a_output[i] *)RArrow(
+            (* post of a_output[i] *)RArrow(RInt(RId var_v_output), RBool(
+              ROr(
+                (* 0 <= i_a_input < i ==> *)ROr(
+                  RPred(Formula.Lt, [Arith.Var var_i_output; Arith.Int 0]),
+                  RPred(Formula.Le, [Arith.Var var_n; Arith.Var var_i_output])
+                ),
+                RPred(Formula.Eq, [Arith.Var var_v_output; Arith.Int 1])
+              )
+            )),
+            (* pre of a_output[i] *)RBool(RTrue)
+          )
+        ),
+        RBool(RTrue)
+      ),
+      (* pre *)RBool(RTrue)
+    )
+  )))
+
 (* infer with annotations *)
 let infer_based_on_annottations hes (env: Rtype.t IdMap.t) top =
 
   print_env env;
 
   let env = Rethfl_syntax.IdMap.mapi env ~f:(fun ~key:id ~data:rty -> (
-    if id.name = "SUM"
+    if id.name = annotated_func
         then annotation
         else rty
   )) in
@@ -406,7 +453,7 @@ let infer_based_on_annottations hes (env: Rtype.t IdMap.t) top =
     let open Rhflz in 
       {x with body=Rhflz.translate_if x.body}) hes 
   in
-  let hes = List.filter (fun x -> x.var.name <> "SUM") hes in
+  let hes = List.filter (fun x -> x.var.name <> annotated_func) hes in
   print_hes hes;
   let call_solver_with_timer hes solver = 
     add_mesure_time "CHC Solver" @@ fun () ->
@@ -507,7 +554,7 @@ let check_annotation hes env top =
   print_env env;
 
   let env = Rethfl_syntax.IdMap.mapi env ~f:(fun ~key:id ~data:rty -> (
-    if id.name = "SUM"
+    if id.name = annotated_func
         then annotation
         else rty
   )) in
@@ -515,18 +562,18 @@ let check_annotation hes env top =
   print_env env;
   (* END: specify type of SUM in env *)
 
-  let top = (List.find (fun x -> x.var.name = "SUM") hes).var in
+  let top = (List.find (fun x -> x.var.name = annotated_func) hes).var in
   let hes = List.map (fun x -> 
     let open Rhflz in 
       {x with body=Rhflz.translate_if x.body}) hes 
   in
 
   (* remove unrelated rules *)
-  let hes = List.filter (fun x -> x.var.name <> "MAIN_195" ) hes in
+  let hes = List.filter (fun x -> x.var.name <> main_func ) hes in
 
   (* modify the expected type of SUM in hes *)
   let hes = List.map (fun x -> 
-    if x.var.name = "SUM" then (
+    if x.var.name = annotated_func then (
       {x with var={x.var with ty=annotation}}
     ) else x
   ) hes in
