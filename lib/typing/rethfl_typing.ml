@@ -29,4 +29,4 @@ let main x top_old =
   print_newline();
   *)
   let env = generate_env y in
-  Infer.check_annotation y env top
+  Infer.infer_based_on_annottations y env top
