@@ -446,11 +446,18 @@ let annotation_array_init = {
   annotated_type = annotated_type_array_init;
 }
 
+let annotation_array_init_idnat = {
+  main_func = "MAIN_630";
+  annotated_func = "INIT";
+  annotated_type = annotated_type_array_init;
+}
+    
 module StringMap = Map.Make (String);;
 
 let annotations = StringMap.of_seq @@ List.to_seq [
   (* ("SUM", annotation_sum); *)
   ("array_init", annotation_array_init);
+  ("array_init_idnat", annotation_array_init_idnat);
 ]
 
 let annotation = StringMap.find (Sys.getenv "ANNOTATION") annotations
