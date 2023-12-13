@@ -376,8 +376,12 @@ let print_env (env: Rtype.t IdMap.t) =
   ));
   print_string "[print_env:end]\n"
 
-let main_func = "MAIN_500"
-let annotated_func = "INIT"
+type annotation_config = {
+  main_func: string;
+  annotated_func: string;
+  annotated_type: Rtype.t;
+}
+
 
 let annotation_sum = 
   let var_n = Rethfl_syntax.Id.gen ~name:"n" `Int in
@@ -392,7 +396,7 @@ let annotation_sum =
     )
   )
 
-let annotation =
+let annotated_type_array_init =
   let var_i = Rethfl_syntax.Id.gen ~name:"i" `Int in
   let var_n = Rethfl_syntax.Id.gen ~name:"n" `Int in
   let var_i_input = Rethfl_syntax.Id.gen ~name:"i_input" `Int in
@@ -436,14 +440,29 @@ let annotation =
     )
   )))
 
+let annotation_array_init = {
+  main_func = "MAIN_500";
+  annotated_func = "INIT";
+  annotated_type = annotated_type_array_init;
+}
+
+module StringMap = Map.Make (String);;
+
+let annotations = StringMap.of_seq @@ List.to_seq [
+  (* ("SUM", annotation_sum); *)
+  ("array_init", annotation_array_init);
+]
+
+let annotation = StringMap.find (Sys.getenv "ANNOTATION") annotations
+
 (* infer with annotations *)
 let infer_based_on_annottations hes (env: Rtype.t IdMap.t) top =
 
   print_env env;
 
   let env = Rethfl_syntax.IdMap.mapi env ~f:(fun ~key:id ~data:rty -> (
-    if id.name = annotated_func
-        then annotation
+    if id.name = annotation.annotated_func
+        then annotation.annotated_type
         else rty
   )) in
 
@@ -453,7 +472,7 @@ let infer_based_on_annottations hes (env: Rtype.t IdMap.t) top =
     let open Rhflz in 
       {x with body=Rhflz.translate_if x.body}) hes 
   in
-  let hes = List.filter (fun x -> x.var.name <> annotated_func) hes in
+  let hes = List.filter (fun x -> x.var.name <> annotation.annotated_func) hes in
   print_hes hes;
   let call_solver_with_timer hes solver = 
     add_mesure_time "CHC Solver" @@ fun () ->
@@ -554,27 +573,27 @@ let check_annotation hes env top =
   print_env env;
 
   let env = Rethfl_syntax.IdMap.mapi env ~f:(fun ~key:id ~data:rty -> (
-    if id.name = annotated_func
-        then annotation
+    if id.name = annotation.annotated_func
+        then annotation.annotated_type
         else rty
   )) in
 
   print_env env;
   (* END: specify type of SUM in env *)
 
-  let top = (List.find (fun x -> x.var.name = annotated_func) hes).var in
+  let top = (List.find (fun x -> x.var.name = annotation.annotated_func) hes).var in
   let hes = List.map (fun x -> 
     let open Rhflz in 
       {x with body=Rhflz.translate_if x.body}) hes 
   in
 
   (* remove unrelated rules *)
-  let hes = List.filter (fun x -> x.var.name <> main_func ) hes in
+  let hes = List.filter (fun x -> x.var.name <> annotation.main_func ) hes in
 
   (* modify the expected type of SUM in hes *)
   let hes = List.map (fun x -> 
-    if x.var.name = annotated_func then (
-      {x with var={x.var with ty=annotation}}
+    if x.var.name = annotation.annotated_func then (
+      {x with var={x.var with ty=annotation.annotated_type}}
     ) else x
   ) hes in
   (* END: modify the expected type of SUM in hes *)

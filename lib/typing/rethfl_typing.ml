@@ -29,4 +29,7 @@ let main x top_old =
   print_newline();
   *)
   let env = generate_env y in
-  Infer.infer_based_on_annottations y env top
+  match (Sys.getenv "CHECK_TARGET") with
+    | "toplevel" -> Infer.infer_based_on_annottations y env top
+    | "annotation" -> Infer.check_annotation y env top
+    | _ -> failwith "Invalid CHECK_TARGET"
