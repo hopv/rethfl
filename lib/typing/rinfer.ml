@@ -382,85 +382,89 @@ type annotation_config = {
   annotated_type: Rtype.t;
 }
 
+module StringMap = Map.Make (String)
 
-let annotation_sum = 
-  let var_n = Rethfl_syntax.Id.gen ~name:"n" `Int in
-  let var_s = Rethfl_syntax.Id.gen ~name:"s" `Int in
-  RArrow(RInt(RId var_n),
-    RArrow(* wp *)(
-      RArrow(* post *)(
-        RInt(RId var_s),
-        RBool(RPred(Formula.Le, [Arith.Var var_n; Arith.Var var_s]))
-      ),
-      RBool(RTrue)
-    )
-  )
-
-let annotated_type_array_init =
-  let var_i = Rethfl_syntax.Id.gen ~name:"i" `Int in
-  let var_n = Rethfl_syntax.Id.gen ~name:"n" `Int in
-  let var_i_input = Rethfl_syntax.Id.gen ~name:"i_input" `Int in
-  let var_v_input = Rethfl_syntax.Id.gen ~name:"v_input" `Int in
-  let var_i_output = Rethfl_syntax.Id.gen ~name:"i_output" `Int in
-  let var_v_output = Rethfl_syntax.Id.gen ~name:"v_output" `Int in
-  RArrow(RInt(RId var_i), RArrow(RInt (RId var_n), RArrow(
-    (* a_input *)RArrow(RInt(RId var_i_input),
-      (* wp of a_input *)RArrow(
-        (* post of a_input *)RArrow(RInt(RId var_v_input), RBool(
-          ROr(
-            (* 0 <= i_a_input < i ==> *)ROr(
-              RPred(Formula.Lt, [Arith.Var var_i_input; Arith.Int 0]),
-              RPred(Formula.Le, [Arith.Var var_i; Arith.Var var_i_input])
-            ),
-            RPred(Formula.Eq, [Arith.Var var_v_input; Arith.Int 1])
-          )
-        )),
-        RBool(RTrue)
-      )
-    ),
-    (* wp *)RArrow(
-      (* post *)RArrow(
-        (* a_output *)RArrow(RInt(RId var_i_output),
-          (* wp of a_output[i] *)RArrow(
-            (* post of a_output[i] *)RArrow(RInt(RId var_v_output), RBool(
-              ROr(
-                (* 0 <= i_a_input < i ==> *)ROr(
-                  RPred(Formula.Lt, [Arith.Var var_i_output; Arith.Int 0]),
-                  RPred(Formula.Le, [Arith.Var var_n; Arith.Var var_i_output])
-                ),
-                RPred(Formula.Eq, [Arith.Var var_v_output; Arith.Int 1])
-              )
-            )),
-            (* pre of a_output[i] *)RBool(RTrue)
-          )
+let annotation: annotation_config =
+  if Option.is_none (Sys.getenv_opt "ANNOTATION") then Obj.magic () else 
+  let annotation_sum = 
+    let var_n = Rethfl_syntax.Id.gen ~name:"n" `Int in
+    let var_s = Rethfl_syntax.Id.gen ~name:"s" `Int in
+    RArrow(RInt(RId var_n),
+      RArrow(* wp *)(
+        RArrow(* post *)(
+          RInt(RId var_s),
+          RBool(RPred(Formula.Le, [Arith.Var var_n; Arith.Var var_s]))
         ),
         RBool(RTrue)
-      ),
-      (* pre *)RBool(RTrue)
+      )
     )
-  )))
+  in
 
-let annotation_array_init = {
-  main_func = "MAIN_500";
-  annotated_func = "INIT";
-  annotated_type = annotated_type_array_init;
-}
+  let annotated_type_array_init =
+    let var_i = Rethfl_syntax.Id.gen ~name:"i" `Int in
+    let var_n = Rethfl_syntax.Id.gen ~name:"n" `Int in
+    let var_i_input = Rethfl_syntax.Id.gen ~name:"i_input" `Int in
+    let var_v_input = Rethfl_syntax.Id.gen ~name:"v_input" `Int in
+    let var_i_output = Rethfl_syntax.Id.gen ~name:"i_output" `Int in
+    let var_v_output = Rethfl_syntax.Id.gen ~name:"v_output" `Int in
+    RArrow(RInt(RId var_i), RArrow(RInt (RId var_n), RArrow(
+      (* a_input *)RArrow(RInt(RId var_i_input),
+        (* wp of a_input *)RArrow(
+          (* post of a_input *)RArrow(RInt(RId var_v_input), RBool(
+            ROr(
+              (* 0 <= i_a_input < i ==> *)ROr(
+                RPred(Formula.Lt, [Arith.Var var_i_input; Arith.Int 0]),
+                RPred(Formula.Le, [Arith.Var var_i; Arith.Var var_i_input])
+              ),
+              RPred(Formula.Eq, [Arith.Var var_v_input; Arith.Int 1])
+            )
+          )),
+          RBool(RTrue)
+        )
+      ),
+      (* wp *)RArrow(
+        (* post *)RArrow(
+          (* a_output *)RArrow(RInt(RId var_i_output),
+            (* wp of a_output[i] *)RArrow(
+              (* post of a_output[i] *)RArrow(RInt(RId var_v_output), RBool(
+                ROr(
+                  (* 0 <= i_a_input < i ==> *)ROr(
+                    RPred(Formula.Lt, [Arith.Var var_i_output; Arith.Int 0]),
+                    RPred(Formula.Le, [Arith.Var var_n; Arith.Var var_i_output])
+                  ),
+                  RPred(Formula.Eq, [Arith.Var var_v_output; Arith.Int 1])
+                )
+              )),
+              (* pre of a_output[i] *)RBool(RTrue)
+            )
+          ),
+          RBool(RTrue)
+        ),
+        (* pre *)RBool(RTrue)
+      )
+    )))
+  in
 
-let annotation_array_init_idnat = {
-  main_func = "MAIN_630";
-  annotated_func = "INIT";
-  annotated_type = annotated_type_array_init;
-}
-    
-module StringMap = Map.Make (String);;
+  let annotation_array_init = {
+    main_func = "MAIN_500";
+    annotated_func = "INIT";
+    annotated_type = annotated_type_array_init;
+  }
+  in
 
-let annotations = StringMap.of_seq @@ List.to_seq [
-  (* ("SUM", annotation_sum); *)
-  ("array_init", annotation_array_init);
-  ("array_init_idnat", annotation_array_init_idnat);
-]
+  let annotation_array_init_idnat = {
+    main_func = "MAIN_630";
+    annotated_func = "INIT";
+    annotated_type = annotated_type_array_init;
+  } in
 
-let annotation = StringMap.find (Sys.getenv "ANNOTATION") annotations
+  let annotations = StringMap.of_seq @@ List.to_seq [
+    (* ("SUM", annotation_sum); *)
+    ("array_init", annotation_array_init);
+    ("array_init_idnat", annotation_array_init_idnat);
+  ] in
+
+  StringMap.find (Sys.getenv "ANNOTATION") annotations
 
 (* infer with annotations *)
 let infer_based_on_annottations hes (env: Rtype.t IdMap.t) top =
