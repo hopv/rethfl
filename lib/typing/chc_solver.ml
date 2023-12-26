@@ -219,6 +219,7 @@ let parse_model model =
           | "and" -> `And 
           | "or"  -> `Or 
           | "not" -> `Not 
+          (* | "forall" -> `Forall (ss) *)
           | var -> `Var var
           | s     -> fail "parse_formula:list" (Atom s)
         in
