@@ -36,7 +36,7 @@ let pred2smt2 pred args =
 let rec arith2smt2 = 
   let open Arith in
   function 
-  | Int x -> Printf.sprintf "%d" x
+  | Int x -> if x>=0 then Printf.sprintf "%d" x else Printf.sprintf "(- %d)" (-x)
   | Var id -> Id.to_string id
   | Op (op, l) -> 
     let args = ariths2smt2 l in
