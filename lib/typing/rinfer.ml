@@ -458,10 +458,109 @@ let annotation: annotation_config =
     annotated_type = annotated_type_array_init;
   } in
 
+  let rand (rs: refinement list): refinement =
+    match rs with
+    | [] -> failwith "program error(rand)"
+    | x::xs -> List.fold_left (fun x y -> RAnd(x, y)) x xs
+  in
+
+  let ror (rs: refinement list): refinement =
+    match rs with
+    | [] -> failwith "program error(ror)"
+    | x::xs -> List.fold_left (fun x y -> ROr(x, y)) x xs
+  in
+
+  let inrange lower mid upper =
+    RAnd(
+      RPred(Formula.Le, [lower; mid]),
+      RPred(Formula.Le, [mid; upper])
+    ) in
+
+  let annotation_kmp_loopShift = {
+    main_func = "MAIN_1425";
+    annotated_func = "LOOPSHIFT";
+    annotated_type =
+      let var_plen = Rethfl_syntax.Id.gen ~name:"plen" `Int in
+      let var_slen = Rethfl_syntax.Id.gen ~name:"slen" `Int in
+      let var_i = Rethfl_syntax.Id.gen ~name:"i" `Int in
+      let var_j = Rethfl_syntax.Id.gen ~name:"j" `Int in
+      let var_pat_i = Rethfl_syntax.Id.gen ~name:"pat_i" `Int in
+      let var_pat_v = Rethfl_syntax.Id.gen ~name:"pat_v" `Int in
+      let var_ain_i = Rethfl_syntax.Id.gen ~name:"ain_i" `Int in
+      let var_ain_v = Rethfl_syntax.Id.gen ~name:"ain_v" `Int in
+      let var_aout_i = Rethfl_syntax.Id.gen ~name:"aout_i" `Int in
+      let var_aout_v = Rethfl_syntax.Id.gen ~name:"aout_v" `Int in
+      RArrow(
+        RInt(RId var_plen),
+        RArrow(
+          RInt(RId var_slen),
+          RArrow(
+            (* [start] pat: (int -> ((int -> bool) -> bool)) *)RArrow(
+              RInt(RId var_pat_i),
+              RArrow(
+                RArrow(
+                  RInt(RId var_pat_v),
+                  RBool(RTrue)
+                ),
+                RBool(inrange (Arith.Int 0) (Arith.Var var_pat_i) (Arith.Op (Arith.Sub,[Arith.Var var_plen; Arith.Int 1])))
+              )
+            )(* [end] pat *),
+            RArrow(
+              RInt(RId var_i),
+              RArrow(
+                RInt(RId var_j),
+                RArrow(
+                  (* [start] shiftArray1: (int -> ((int -> bool) -> bool))*)
+                    RArrow(
+                      RInt(RId var_ain_i),
+                      RArrow(
+                        RArrow(
+                          RInt(RId var_ain_v),
+                          RBool(inrange (Arith.Int (-1)) (Arith.Var var_ain_v) (Arith.Op (Arith.Sub,[Arith.Var var_ain_i; Arith.Int 1])))
+                        ),
+                        RBool(inrange (Arith.Int 0) (Arith.Var var_ain_i) (Arith.Op (Arith.Sub,[Arith.Var var_plen; Arith.Int 1])))
+                      )
+                    )
+                  (* [end] shiftArray1*),
+                  RArrow(
+                    (* [start] k: ((int -> ((int -> bool) -> bool)) -> bool) *)
+                      RArrow(
+                        RArrow(
+                          RInt(RId var_aout_i),
+                          RArrow(
+                            RArrow(
+                              RInt(RId var_aout_v),
+                              RBool(inrange (Arith.Int (-1)) (Arith.Var var_aout_v) (Arith.Op (Arith.Sub,[Arith.Var var_aout_i; Arith.Int 1])))
+                            ),
+                            RBool(inrange (Arith.Int 0) (Arith.Var var_aout_i) (Arith.Op (Arith.Sub,[Arith.Var var_plen; Arith.Int 1])))
+                          )
+                        ),
+                        RBool(RTrue (* pre *))
+                      )
+                    (* [end] k *),
+                    RBool(
+                      (* pre = plen>0 /\ i inrange[-1,plen-2] /\ j inrange[i+1,plen] *)
+                      rand [
+                        RPred(Formula.Lt, [Arith.Int 0; Arith.Var var_plen]);
+                        inrange (Arith.Int (-1)) (Arith.Var var_i) (Arith.Op (Arith.Sub, [Arith.Var var_plen; Arith.Int 2]));
+                        inrange (Arith.Op (Arith.Add, [Arith.Var var_i; Arith.Int 1])) (Arith.Var var_j) (Arith.Var var_plen);
+                      ]  
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+  } in
+      
+
   let annotations = StringMap.of_seq @@ List.to_seq [
     (* ("SUM", annotation_sum); *)
     ("array_init", annotation_array_init);
     ("array_init_idnat", annotation_array_init_idnat);
+    ("kmp_loopShift", annotation_kmp_loopShift);
   ] in
 
   StringMap.find (Sys.getenv "ANNOTATION") annotations
