@@ -554,13 +554,98 @@ let annotation: annotation_config =
         )
       )
   } in
-      
+
+
+  let annotation_kmp_loop = {
+    main_func = "MAIN_1425";
+    annotated_func = "LOOP";
+    annotated_type =
+      let var_plen = Rethfl_syntax.Id.gen ~name:"plen" `Int in
+      let var_slen = Rethfl_syntax.Id.gen ~name:"slen" `Int in
+      let var_s = Rethfl_syntax.Id.gen ~name:"s" `Int in
+      let var_p = Rethfl_syntax.Id.gen ~name:"p" `Int in
+      let var_pat_i = Rethfl_syntax.Id.gen ~name:"pat_i" `Int in
+      let var_pat_v = Rethfl_syntax.Id.gen ~name:"pat_v" `Int in
+      let var_str_i = Rethfl_syntax.Id.gen ~name:"str_i" `Int in
+      let var_str_v = Rethfl_syntax.Id.gen ~name:"str_v" `Int in
+      let var_ain_i = Rethfl_syntax.Id.gen ~name:"ain_i" `Int in
+      let var_ain_v = Rethfl_syntax.Id.gen ~name:"ain_v" `Int in
+      let var_res = Rethfl_syntax.Id.gen ~name:"res" `Int in
+      RArrow(
+        RInt(RId var_plen),
+        RArrow(
+          RInt(RId var_slen),
+          RArrow(
+            (* [start] pat: (int -> ((int -> bool) -> bool)) *)RArrow(
+              RInt(RId var_pat_i),
+              RArrow(
+                RArrow(
+                  RInt(RId var_pat_v),
+                  RBool(RTrue)
+                ),
+                RBool(inrange (Arith.Int 0) (Arith.Var var_pat_i) (Arith.Op (Arith.Sub,[Arith.Var var_plen; Arith.Int 1])))
+              )
+            )(* [end] pat *),
+            RArrow(
+              (* [start] shiftArray3: (int -> ((int -> bool) -> bool))*)
+                RArrow(
+                  RInt(RId var_ain_i),
+                  RArrow(
+                    RArrow(
+                      RInt(RId var_ain_v),
+                      RBool(inrange (Arith.Int (-1)) (Arith.Var var_ain_v) (Arith.Op (Arith.Sub,[Arith.Var var_ain_i; Arith.Int 1])))
+                    ),
+                    RBool(inrange (Arith.Int 0) (Arith.Var var_ain_i) (Arith.Op (Arith.Sub,[Arith.Var var_plen; Arith.Int 1])))
+                  )
+                )
+              (* [end] shiftArray3*),
+              RArrow(
+                (* [start] str: (int -> ((int -> bool) -> bool)) *)RArrow(
+                  RInt(RId var_str_i),
+                  RArrow(
+                    RArrow(
+                      RInt(RId var_str_v),
+                      RBool(RTrue)
+                    ),
+                    RBool(inrange (Arith.Int 0) (Arith.Var var_str_i) (Arith.Op (Arith.Sub,[Arith.Var var_slen; Arith.Int 1])))
+                  )
+                )(* [end] str *),
+                RArrow(
+                  RInt(RId var_s),
+                  RArrow(
+                    RInt(RId var_p),
+                    RArrow(
+                      (* [start] k: (int -> bool) *)
+                        RArrow(
+                          RInt(RId var_res),
+                          RBool(RTrue)
+                        )
+                      (* [end] k *),
+                      RBool(
+                        (* pre = plen>0 /\ slen>0 /\ s inrange[0,slen] /\ p inrange[0,plen] *)
+                        rand [
+                          RPred(Formula.Lt, [Arith.Int 0; Arith.Var var_plen]);
+                          RPred(Formula.Lt, [Arith.Int 0; Arith.Var var_slen]);
+                          inrange (Arith.Int 0) (Arith.Var var_p) (Arith.Var var_plen);
+                          inrange (Arith.Int 0) (Arith.Var var_s) (Arith.Var var_slen);
+                        ]  
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+  } in
 
   let annotations = StringMap.of_seq @@ List.to_seq [
     (* ("SUM", annotation_sum); *)
     ("array_init", annotation_array_init);
     ("array_init_idnat", annotation_array_init_idnat);
     ("kmp_loopShift", annotation_kmp_loopShift);
+    ("kmp_loop", annotation_kmp_loop);
   ] in
 
   StringMap.find (Sys.getenv "ANNOTATION") annotations
@@ -582,7 +667,7 @@ let infer_based_on_annottations hes (env: Rtype.t IdMap.t) top =
     let open Rhflz in 
       {x with body=Rhflz.translate_if x.body}) hes 
   in
-  let hes = List.filter (fun x -> x.var.name <> annotation.annotated_func) hes in
+  let hes = List.filter (fun x -> x.var.name <> annotation.annotated_func && x.var.name <> "LOOPSHIFT") hes in
   print_hes hes;
   let call_solver_with_timer hes solver = 
     add_mesure_time "CHC Solver" @@ fun () ->
