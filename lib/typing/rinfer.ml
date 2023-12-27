@@ -377,9 +377,10 @@ let print_env (env: Rtype.t IdMap.t) =
   print_string "[print_env:end]\n"
 
 type annotation_config = {
-  main_func: string;
   annotated_func: string;
   annotated_type: Rtype.t;
+  dependencies_annotated_func: string list;
+  dependencies_toplevel: string list;
 }
 
 module StringMap = Map.Make (String)
@@ -446,16 +447,18 @@ let annotation: annotation_config =
   in
 
   let annotation_array_init = {
-    main_func = "MAIN_500";
     annotated_func = "INIT";
     annotated_type = annotated_type_array_init;
+    dependencies_annotated_func = ["INIT"];
+    dependencies_toplevel = ["MAIN_500"; "INIT"];
   }
   in
 
   let annotation_array_init_idnat = {
-    main_func = "MAIN_630";
     annotated_func = "INIT";
     annotated_type = annotated_type_array_init;
+    dependencies_toplevel = ["MAIN_630"; "IDNAT"];
+    dependencies_annotated_func = ["INIT"; "IDNAT"];
   } in
 
   let rand (rs: refinement list): refinement =
@@ -477,7 +480,8 @@ let annotation: annotation_config =
     ) in
 
   let annotation_kmp_loopShift = {
-    main_func = "MAIN_1425";
+    dependencies_toplevel = ["MAIN_1425"; "LOOPSHIFT"; "LOOP"; "MAKE_ARRAY"];
+    dependencies_annotated_func = ["LOOPSHIFT"];
     annotated_func = "LOOPSHIFT";
     annotated_type =
       let var_plen = Rethfl_syntax.Id.gen ~name:"plen" `Int in
@@ -557,7 +561,8 @@ let annotation: annotation_config =
 
 
   let annotation_kmp_loop = {
-    main_func = "MAIN_1425";
+    dependencies_toplevel = ["MAIN_1425"; "LOOPSHIFT"; "LOOP"; "MAKE_ARRAY"];
+    dependencies_annotated_func = ["LOOP"];
     annotated_func = "LOOP";
     annotated_type =
       let var_plen = Rethfl_syntax.Id.gen ~name:"plen" `Int in
@@ -667,7 +672,7 @@ let infer_based_on_annottations hes (env: Rtype.t IdMap.t) top =
     let open Rhflz in 
       {x with body=Rhflz.translate_if x.body}) hes 
   in
-  let hes = List.filter (fun x -> x.var.name <> annotation.annotated_func && x.var.name <> "LOOPSHIFT") hes in
+  let hes = List.filter (fun x -> x.var.name <> annotation.annotated_func && List.exists (fun s -> s = x.var.name) annotation.dependencies_toplevel) hes in
   print_hes hes;
   let call_solver_with_timer hes solver = 
     add_mesure_time "CHC Solver" @@ fun () ->
@@ -783,7 +788,7 @@ let check_annotation hes env top =
   in
 
   (* remove unrelated rules *)
-  let hes = List.filter (fun x -> x.var.name <> annotation.main_func ) hes in
+  let hes = List.filter (fun x -> List.exists (fun s -> s = x.var.name) annotation.dependencies_annotated_func) hes in
 
   (* modify the expected type of SUM in hes *)
   let hes = List.map (fun x -> 
