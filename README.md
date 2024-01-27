@@ -86,3 +86,50 @@ If you want to run a manually built executable, run the following command instea
 ``` shell
 dune exec rethfl -- <filename>
 ```
+
+
+## Type Annotation (Experimenal Feature)
+ReTHFL supports semi-automated verification via user specified refinement type annotations.
+
+### How to use
+
+Use options `--annot <input.annot>` and `--target <CHECK_TARGET>` together with `--no-disprove`.
+For example:
+
+```
+$ rethfl --no-disprove kmp.hfl --annot kmp.loop.annot --target toplevel
+```
+
+`CHECK_TARGET` must be one of the following:
+
+- `toplevel`: Checks whether the toplevel (i.e. the main) formula is valid under the assumption that the type annotation is correct.
+- `annotation`: Checks whether the type annotation is correct.
+
+If ReTHFL returns valid for both `--target toplevel` and `--target annotation`, then it means the given formula is valid.
+Since the *disprove mode is yet not implemented* for this semi-automated method, `--no-disprove` must be set. 
+
+### Annotation file
+Here is an exmalpe of an `.annot` file:
+```
+%TYPE
+
+LOOP:
+  (plen: int ->
+  (slen: int ->
+  ((i: int -> ((int -> *) -> *[(0 <= i /\ i < plen)])) ->
+  ((i: int -> ((v: int -> *[(0 <= v + 1 /\ v + 1 < plen)]) -> *[(0 <= i /\ i < plen)])) ->
+  ((i: int -> ((int -> *) -> *[(0 <= i /\ i < slen)])) ->
+  (s: int ->
+  (p: int ->
+  ((int -> *) ->
+  *[0<plen /\ 0<slen /\ 0<=p /\ 0<=s]))))))))
+```
+See `/input/annot` for further examples.
+Please consult our paper [1] for the meaning of the refinement types.
+
+LIMITATION: Currently, we only allow  **one recursively defined predicate to be annotated**.
+
+## Papers
+1. The main paper: "A New Refinement Type System for Automated νHFLZ Validity Checking". DOI: [10.1007/978-3-030-64437-6_5](https://doi.org/10.1007/978-3-030-64437-6_5)
+2. "On the Relationship between Dijkstra Monads and
+Higher-Order Fixpoint Logic". (To appear)
