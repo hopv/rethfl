@@ -31,6 +31,7 @@ let selected_solver size =
   else if sv = "auto" then auto
   else if sv = "z3" || sv = "spacer" then `Spacer
   else if sv = "hoice" then `Hoice
+  else if sv = "eld" || sv = "eldarica" then `Eldarica
   else if sv = "fptprove" then `Fptprove
   else failwith ("Unknown solver: " ^ sv)
 
@@ -57,6 +58,7 @@ let call_fptprove timeout file =
 let selected_cmd timeout = function
   | `Spacer -> call_template [|"z3"; "fp.engine=spacer"|] timeout
   | `Hoice -> call_template [|"hoice"|] timeout
+  | `Eldarica -> call_template [|"eld"|] timeout
   | `Fptprove -> call_fptprove timeout
   | _ -> failwith "you cannot use this"
   
@@ -87,7 +89,10 @@ let get_epilogue =
   | `Eldarica ->
     "\
     (check-sat)
+    (get-model)
     "
+    (* eldarica emits a warning to stderr when (get-model) is called for unstat
+       instances, but this doesn't cause any problem for the get_unsat_proof function *)
 
 let rec collect_preds chcs m = 
   let rec inner rt m = match rt with 
@@ -273,7 +278,7 @@ let check_sat ?(timeout=100000.0) chcs solver =
           | _ -> loop xs
         end
     in loop tries
-  | `Spacer | `Hoice | `Fptprove as sv -> check_sat_inner timeout sv
+  | `Spacer | `Hoice | `Eldarica | `Fptprove as sv -> check_sat_inner timeout sv
 
 (* usp: unsat proof *)
 let rec unsat_proof_of_eldarica_cex nodes = 

@@ -85,7 +85,7 @@ type params =
   
   (* Typing *)
   ; solver : string [@default "auto"] [@docs "Typing"] [@docv "solver_name"]
-  (** Choose background CHC solver. Available: auto z3, hoice, fptprover *)
+  (** Choose background CHC solver. Available: auto z3, hoice, eldarica, fptprover *)
 
   ; show_refinement: bool [@default false] [@docs "Typing"] [@docv "show refinement"]
   (** Show refinement types. This sometimes fails because of parsing the solution from CHC solver... *)
