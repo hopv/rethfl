@@ -385,6 +385,12 @@ type annotation_config = {
 
 module StringMap = Map.Make (String)
 
+let rec string_of_rty_skeleton (rty: Rtype.t) =
+    match rty with
+    | RArrow(x, y) -> "RArrow("^ (string_of_rty_skeleton x)^", "^( string_of_rty_skeleton y)^")"
+    | RBool(_) -> "RBool(RTrue)"
+    | RInt(_) -> "RInt(RId Rethfl_syntax.Id.(gen ~name:\"x\" `Int))"
+
 let annotation: annotation_config =
   if Option.is_none (Sys.getenv_opt "ANNOTATION") then Obj.magic () else 
   let annotation_sum = 
@@ -479,6 +485,12 @@ let annotation: annotation_config =
       RPred(Formula.Le, [mid; upper])
     ) in
 
+  let inrange_halfopen lower mid upper =
+    RAnd(
+      RPred(Formula.Le, [lower; mid]),
+      RPred(Formula.Lt, [mid; upper])
+    ) in
+  
   let annotation_kmp_loopShift = {
     dependencies_toplevel = ["MAIN_1425"; "LOOPSHIFT"; "LOOP"; "MAKE_ARRAY"];
     dependencies_annotated_func = ["LOOPSHIFT"];
@@ -645,12 +657,437 @@ let annotation: annotation_config =
       )
   } in
 
+  let annotation_fold_fun_list_fold_right = {
+    dependencies_toplevel = ["MAIN_1078"; "FOLD_RIGHT"; "MAKE_LIST"];
+    dependencies_annotated_func = ["FOLD_RIGHT"];
+    annotated_func = "FOLD_RIGHT";
+    annotated_type =
+      let var_x1 = Rethfl_syntax.Id.gen ~name:"x1" `Int in
+      let rty_nat_to_nat () =
+        let var_x = Rethfl_syntax.Id.gen ~name:"x" `Int in
+        let var_y = Rethfl_syntax.Id.gen ~name:"y" `Int in
+        RArrow(
+          RInt(RId var_x), 
+          RArrow(
+            RArrow(
+              RInt(RId var_y),
+              RBool(RPred(Formula.Le, [Arith.Int 0; Arith.Var var_y]))
+            ),
+            RBool(RPred(Formula.Le, [Arith.Int 0; Arith.Var var_x]))
+          )
+        ) in
+      let var_xs_len = Rethfl_syntax.Id.gen ~name:"xs_len" `Int in
+      RArrow(
+        (* [start] f: (nat -> M nat) -> (nat -> M nat) -> nat -> M nat *)
+        RArrow(
+          rty_nat_to_nat (),
+          RArrow(
+            rty_nat_to_nat (),
+            rty_nat_to_nat ()
+          )
+        ),
+        (* [end] f: (nat -> M nat) -> (nat -> M nat) -> nat -> M nat *)
+        RArrow(
+          RInt(RId var_xs_len),
+          RArrow(
+            (* [start] xs_getvalue: int -> M (nat -> M nat) *)
+            RArrow(
+              RInt(RId var_x1),
+              RArrow(
+                RArrow(
+                  rty_nat_to_nat (),
+                  RBool(RTrue)
+                ),
+                RBool(RTrue)
+              )
+            ),
+            (* [end] xs_getvalue: int -> M (nat -> M nat) *)
+            RArrow(
+              (* [start] init: nat -> M nat *)
+              rty_nat_to_nat (),
+              (* [end] init: nat -> M nat *)
+              RArrow(
+                (* [start] k_fold_right: (nat -> M nat) -> bool *)
+                RArrow(
+                  rty_nat_to_nat (),
+                  RBool(RTrue)
+                ),
+                (* [end] k_fold_right: (nat -> M nat) -> bool *)
+                RBool(RTrue)
+              )
+            )
+          )
+        )
+      )
+
+  } in
+
+  let annotation_fold_fun_list_make_list = {
+    dependencies_toplevel = ["MAIN_1078"; "FOLD_RIGHT"; "MAKE_LIST"];
+    dependencies_annotated_func = ["MAKE_LIST"];
+    annotated_func = "MAKE_LIST";
+    annotated_type =
+      let var_n = Rethfl_syntax.Id.gen ~name:"n" `Int in
+      let var_len = Rethfl_syntax.Id.gen ~name:"len" `Int in
+      let var_i = Rethfl_syntax.Id.gen ~name:"i" `Int in
+      let rty_nat_to_nat () =
+        let var_x = Rethfl_syntax.Id.gen ~name:"x" `Int in
+        let var_y = Rethfl_syntax.Id.gen ~name:"y" `Int in
+        RArrow(
+          RInt(RId var_x), 
+          RArrow(
+            RArrow(
+              RInt(RId var_y),
+              RBool(RPred(Formula.Le, [Arith.Int 0; Arith.Var var_y]))
+            ),
+            RBool(RPred(Formula.Le, [Arith.Int 0; Arith.Var var_x]))
+          )
+        ) in
+      RArrow(
+        RInt(RId var_n),
+        RArrow(
+          (* [start] k:(int -> (i:int -> M (x:int -> y:M int[ensures y>=0][requires x>=0])[requires 0<=i<len]) -> bool)*)
+          RArrow(
+            RInt(RId var_len),
+            RArrow(
+              RArrow(
+                RInt(RId var_i),
+                (* [start] M (x:nat -> y:M nat)[requires 0<=i<n]*)
+                RArrow(
+                  RArrow(
+                    rty_nat_to_nat (),
+                    RBool(RTrue)
+                  ),
+                  RBool(inrange_halfopen (Arith.Int 0) (Arith.Var var_i) (Arith.Var var_n))
+                )
+                (* [end] M (x:nat -> y:M nat)[requires 0<=i<n]*)
+              ),
+              RBool(RPred(Formula.Eq, [Arith.Var var_len; Arith.Var var_n]))
+            )
+          ),
+          (* [end] k:(int -> (i:int -> M (x:int -> y:M int[ensures y>=0][requires x>=0])[requires 0<=i<len]) -> bool)*)
+          RBool(RPred(Formula.Le, [Arith.Int 1; Arith.Var var_n]))
+        )
+      )
+  } in
+
+  (* This type was discovered by inference of annotation_fold_fun_list_fold_right *)
+  let annotation_fold_fun_list_make_list2 = {
+    dependencies_toplevel = ["MAIN_1078"; "FOLD_RIGHT"; "MAKE_LIST"];
+    dependencies_annotated_func = ["MAKE_LIST"];
+    annotated_func = "MAKE_LIST";
+    annotated_type =
+      let var_n = Rethfl_syntax.Id.gen ~name:"n" `Int in
+      let var_len = Rethfl_syntax.Id.gen ~name:"len" `Int in
+      let var_i = Rethfl_syntax.Id.gen ~name:"i" `Int in
+      let var_x = Rethfl_syntax.Id.gen ~name:"x" `Int in
+      let var_y = Rethfl_syntax.Id.gen ~name:"y" `Int in
+      RArrow(
+        RInt(RId var_n),
+        RArrow(
+          RArrow(
+            RInt(RId var_len),
+            RArrow(
+              RArrow(
+                RInt(RId var_i),
+                RArrow(
+                  RArrow(
+                    RArrow(
+                      RInt(RId var_x), 
+                      RArrow(
+                        RArrow(
+                          RInt(RId var_y),
+                          RBool(
+                            RAnd(
+                            RPred(Formula.Le, [Arith.Int 1; Arith.Var var_n]),
+                            ROr(
+                              RPred(Formula.Le, [Arith.Var var_x; Arith.Int (-1)]),
+                              RPred(Formula.Le, [Arith.Int 0; Arith.Var var_y])
+                            )
+                          ))
+                        ),
+                        RBool(RTrue)
+                      )
+                    ),
+                    RBool(RPred(Formula.Le, [Arith.Int 1; Arith.Var var_n]))
+                  ),
+                  RBool(RTrue)
+                )
+              ),
+              RBool(RTrue)
+            )
+          ),
+          RBool(RTrue)
+        )
+      )
+  } in
+
+
+  (* This is minor change of _make_list2 and is more natural *)
+  let annotation_fold_fun_list_make_list3 = {
+    dependencies_toplevel = ["MAIN_1078"; "FOLD_RIGHT"; "MAKE_LIST"];
+    dependencies_annotated_func = ["MAKE_LIST"];
+    annotated_func = "MAKE_LIST";
+    annotated_type =
+      let var_n = Rethfl_syntax.Id.gen ~name:"n" `Int in
+      let var_len = Rethfl_syntax.Id.gen ~name:"len" `Int in
+      let var_i = Rethfl_syntax.Id.gen ~name:"i" `Int in
+      let var_x = Rethfl_syntax.Id.gen ~name:"x" `Int in
+      let var_y = Rethfl_syntax.Id.gen ~name:"y" `Int in
+      RArrow(
+        RInt(RId var_n),
+        RArrow(
+          RArrow(
+            RInt(RId var_len),
+            RArrow(
+              RArrow(
+                RInt(RId var_i),
+                RArrow(
+                  RArrow(
+                    RArrow(
+                      RInt(RId var_x), 
+                      RArrow(
+                        RArrow(
+                          RInt(RId var_y),
+                          RBool(
+                            RPred(Formula.Le, [Arith.Int 0; Arith.Var var_y])
+                          )
+                        ),
+                        RBool(RPred(Formula.Le, [Arith.Int 0; Arith.Var var_x]))
+                      )
+                    ),
+                    RBool(RPred(Formula.Le, [Arith.Int 1; Arith.Var var_n]))
+                  ),
+                  RBool(RTrue)
+                )
+              ),
+              RBool(RTrue)
+            )
+          ),
+          RBool(RTrue)
+        )
+      )
+  } in
+
+  let annotation_risers_risers = {
+    dependencies_toplevel = ["MAIN_2208"; "RISERS"; "MAKE_LIST"];
+    dependencies_annotated_func = ["RISERS"];
+    annotated_func = "RISERS";
+    annotated_type =
+        let var_l1_len = Rethfl_syntax.Id.gen ~name:"l1_len" `Int in
+        let var_l2_len = Rethfl_syntax.Id.gen ~name:"l2_len" `Int in
+        RArrow(
+          RInt(RId var_l1_len),
+          RArrow(
+            (* [start] l1_getvalue:(int -> (int -> bool) -> bool)*)
+            RArrow(
+              RInt(RId (Rethfl_syntax.Id.gen ~name:"x" `Int)),
+              RArrow(
+                RArrow(
+                  RInt(RId (Rethfl_syntax.Id.gen ~name:"x" `Int)),
+                  RBool(RTrue)
+                ),
+                RBool(RTrue)
+              )
+            ),
+            (* [end] l1_getvalue:(int -> (int -> bool) -> bool)*)
+
+            RArrow(
+              (* [start] k *)
+              RArrow(
+                RInt(RId var_l2_len),
+                RArrow(
+                  (* [start] l2_getvalue *)
+                  RArrow(
+                    RInt(RId(Rethfl_syntax.Id.gen ~name:"i2" `Int)),
+                    RArrow(
+                      (* [start] k_v2:(v2_len:int -> v2_getvalue:(bool -> (int -> bool) -> bool) -> bool) *)
+                      RArrow(
+                        RInt(RId(Rethfl_syntax.Id.gen ~name:"v2_len" `Int)),
+                        RArrow(
+                          (* [start] v2_getvalue: (bool -> (int -> bool) -> bool) *)
+                          RArrow(
+                            RBool(RTrue),
+                            RArrow(
+                              RArrow(
+                                RInt(RId(Rethfl_syntax.Id.gen ~name:"x" `Int)),
+                                RBool(RTrue)
+                              ),
+                              RBool(RTrue)
+                            )
+                          ),
+                          (* [end] v2_getvalue: (bool -> (int -> bool) -> bool) *)
+                          RBool(RTrue)
+                        )
+                      ),
+                      (* [end] k_v2:(v2_len:int -> v2_getvalue:(bool -> (int -> bool) -> bool) -> bool) *)
+                      RBool(RTrue)
+                    )
+                  ),
+                  (* [end] l2_getvalue *)
+                  RBool((RAnd(
+                    ROr(
+                      RPred(Formula.Lt, [Arith.Int 0; Arith.Var var_l1_len]),
+                      RPred(Formula.Le, [Arith.Var var_l2_len; Arith.Int 0])
+                    ),
+                    ROr(
+                      RPred(Formula.Le, [Arith.Var var_l1_len; Arith.Int 0]),
+                      RPred(Formula.Lt, [Arith.Int 0; Arith.Var var_l2_len])
+                    )
+                  )))
+                )
+              ),
+              (* [end] k *)
+              RBool(RTrue)
+            )
+          )
+        )
+  } in
+
+  let annotation_risers_make_list = {
+    dependencies_toplevel = ["MAIN_2208"; "RISERS"; "MAKE_LIST"];
+    dependencies_annotated_func = ["MAKE_LIST"];
+    annotated_func = "MAKE_LIST";
+    annotated_type =
+        RArrow(
+          RInt(RId(Rethfl_syntax.Id.gen ~name:"m" `Int)),
+          RArrow(
+            RArrow(
+              RInt(RId(Rethfl_syntax.Id.gen ~name:"len" `Int)),
+              RArrow(
+                RArrow(
+                  RInt(RId (Rethfl_syntax.Id.gen ~name:"i" `Int)),
+                  RArrow(
+                    RArrow(
+                      RInt(RId(Rethfl_syntax.Id.gen ~name:"v" `Int)),
+                      RBool(RTrue)
+                    ),
+                    RBool(RTrue)
+                  )
+                ),
+                RBool(RTrue)
+              )
+            ),
+            RBool(RTrue)
+          )
+        )
+  } in
+
+  let annotation_indirectintro9_f = {
+    dependencies_toplevel = ["MAIN_1524"; "F_WITHOUT_CHECKING_252"];
+    dependencies_annotated_func = ["F_WITHOUT_CHECKING_252"; "APP"];
+    annotated_func = "F_WITHOUT_CHECKING_252";
+    annotated_type =
+      let var_sff = Rethfl_syntax.Id.gen ~name:"sff" `Int in
+      RArrow(
+        RInt(RId Rethfl_syntax.Id.(gen ~name:"x" `Int)),
+        RArrow(
+          RInt(RId Rethfl_syntax.Id.(gen ~name:"x" `Int)),
+          RArrow(
+            RInt(RId Rethfl_syntax.Id.(gen ~name:"x" `Int)),
+            RArrow(
+              (* [start] k:((int -> int -> bool -> (bool -> bool) -> bool) -> bool) *)
+              RArrow(
+                RArrow(
+                  RInt(RId var_sff),
+                  RArrow(
+                    RInt(RId Rethfl_syntax.Id.(gen ~name:"x" `Int)),
+                    RArrow(
+                      RBool(RFalse),
+                      RArrow(
+                        (* [start] bool -> bool *)
+                        RArrow(
+                          RBool(RFalse),
+                          RBool(RTrue)
+                        ),
+                        (* [end] bool -> bool *)
+                        RBool(RPred(Formula.Eq, [Arith.Int 0; Arith.Var var_sff]))
+                      )
+                    )
+                  )
+                ),
+                RBool(RTrue)
+              ),
+              (* [end] k:((int -> int -> bool -> (bool -> bool) -> bool) -> bool) *)
+              RBool(RTrue)
+            )
+          )
+        )
+      )
+  } in
+
+  let annotation_indirectintro9_app = {
+    dependencies_toplevel = ["MAIN_1524"; "F_WITHOUT_CHECKING_252"; "APP"];
+    dependencies_annotated_func = ["APP"];
+    annotated_func = "APP";
+    annotated_type =
+        let intid () = RInt(RId (Rethfl_syntax.Id.gen ~name:"x" `Int)) in
+        let rty_fin () = 
+          let var_sff = Rethfl_syntax.Id.gen ~name:"sff" `Int in
+
+                RArrow(
+                  RInt(RId var_sff),
+                  RArrow(
+                    intid (),
+                    RArrow(
+                      RBool(RFalse),
+                      RArrow(
+                        (* [start] bool -> bool *)
+                        RArrow(
+                          RBool(RFalse),
+                          RBool(RTrue)
+                        ),
+                        (* [end] bool -> bool *)
+                        RBool(RPred(Formula.Eq, [Arith.Int 0; Arith.Var var_sff]))
+                      )
+                    )
+                  )
+                ) in
+                let var_psff = Rethfl_syntax.Id.gen ~name:"psff" `Int in
+                let var_sff2 = Rethfl_syntax.Id.gen ~name:"sff2" `Int in
+    RArrow(intid (), RArrow(intid (), RArrow(intid (), RArrow(intid (), RArrow(intid (), RArrow(intid (), RArrow(intid (), RArrow(intid (),
+    RArrow(
+        (* [start] h*)
+        RArrow(RInt(RId var_psff), RArrow(intid (), RArrow(intid (), RArrow(RArrow(
+        (RArrow(
+          RInt(RId var_sff2),
+          RArrow(
+            intid (),
+            RArrow(
+              RBool(RFalse),
+              RArrow(
+                (* [start] bool -> bool *)
+                RArrow(
+                  RBool(RFalse),
+                  RBool(RTrue)
+                ),
+                (* [end] bool -> bool *)
+                RBool(RPred(Formula.Eq, [Arith.Int 0; Arith.Var var_sff2]))
+              )
+            )
+          )
+        ))
+        , RBool(RTrue)), RBool(RPred(Formula.Eq, [Arith.Int 0; Arith.Var var_psff])))))),
+        (*[end] h*)
+        RArrow(intid (), RArrow(intid (), RArrow(intid (), rty_fin ())))
+        )
+    ))))))))
+  } in 
+
   let annotations = StringMap.of_seq @@ List.to_seq [
     (* ("SUM", annotation_sum); *)
     ("array_init", annotation_array_init);
     ("array_init_idnat", annotation_array_init_idnat);
     ("kmp_loopShift", annotation_kmp_loopShift);
     ("kmp_loop", annotation_kmp_loop);
+    ("fun_fold_list_fold_right", annotation_fold_fun_list_fold_right);
+    ("fun_fold_list_make_list", annotation_fold_fun_list_make_list); (* CHECK_TARGET=toplevel is untypable. why? *)
+    ("fun_fold_list_make_list2", annotation_fold_fun_list_make_list2);
+    ("fun_fold_list_make_list3", annotation_fold_fun_list_make_list3);
+    ("risers_risers", annotation_risers_risers);
+    ("risers_make_list", annotation_risers_make_list);
+    ("indirectintro9_f", annotation_indirectintro9_f);
+    ("indirectintro9_app", annotation_indirectintro9_app);
   ] in
 
   StringMap.find (Sys.getenv "ANNOTATION") annotations
@@ -768,6 +1205,10 @@ let infer_based_on_annottations hes (env: Rtype.t IdMap.t) top =
   | `Unknown -> `Unknown
 
 let check_annotation hes env top = 
+
+  (* let app = List.find (fun x -> x.var.name = "APP") hes in
+  print_string (string_of_rty_skeleton app.var.ty);
+  failwith "hoge"; *)
 
   (* specify type of SUM in env *)
   print_env env;
