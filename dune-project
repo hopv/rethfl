@@ -13,6 +13,7 @@
   ; (description "A longer description")
   (depends cmdliner
           core
+          core_unix
           fmt
           logs
           lwt

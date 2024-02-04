@@ -1,12 +1,13 @@
 (library
  (public_name hflmc2_util)
  (libraries
+   core
+   core_unix
    fmt
    logs
    logs.fmt
    lwt
-   lwt.unix
-   core))
+   lwt.unix))
 
 (env
   (dev
