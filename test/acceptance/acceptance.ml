@@ -5,7 +5,7 @@ let args = [| "dummy_file"
             ; "--quiet"
             ; "--no-inlining"
             |]
-let _ = Hflmc3.Options.parse ~argv:(Array.append args Sys.argv) ()
+let _ = Hflmc3.Options.parse ~argv:(Array.append args (Sys.get_argv ())) ()
 
 (* TODO duneのrootを手に入れる方法はないものか．
  * Sys.getenv_exn "OWD" がそれっぽいけどドキュメントにはなってなさそう
