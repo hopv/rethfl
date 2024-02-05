@@ -219,26 +219,26 @@ module Reduce = struct
       | phi -> phi
     let rec ones = 1 :: ones
     module Scc(Key: Map.Key) = struct
-      module Set = Set.Make'(Key)
-      module Map = Map.Make'(Key)
-      type graph = Set.t Map.t
+      module NodeSet = Set.Make'(Key)
+      module NodeMap = Map.Make'(Key)
+      type graph = NodeSet.t NodeMap.t
       let rg : graph -> graph = fun g ->
-        Map.fold g ~init:Map.empty ~f:begin fun ~key ~data:set map ->
+        Map.fold g ~init:NodeMap.empty ~f:begin fun ~key ~data:set map ->
           let map' =
             if Map.mem map key
             then map
-            else Map.add_exn map ~key ~data:Set.empty
+            else Map.add_exn map ~key ~data:NodeSet.empty
           in
           Set.fold set ~init:map' ~f:begin fun map v ->
             let data =
               match Map.find map v with
               | Some s -> Set.add s key
-              | None   -> Set.singleton key
+              | None   -> NodeSet.singleton key
             in
-            Map.replace map ~key:v ~data
+            NodeMap.replace map ~key:v ~data
           end
         end
-      let rec dfs : graph -> Set.t -> Key.t list -> graph * Key.t list =
+      let rec dfs : graph -> NodeSet.t -> Key.t list -> graph * Key.t list =
         fun g ls r ->
           Set.fold ls ~init:(g,r) ~f:begin fun (g,r) x ->
             match Map.find g x with
@@ -257,7 +257,7 @@ module Reduce = struct
               end
       let scc g =
         let rG = rg g in
-        let map, vs = dfs g (Set.of_list @@ Map.keys g) [] in
+        let map, vs = dfs g (NodeSet.of_list @@ Map.keys g) [] in
         let _, ls =
           List.fold vs ~init:(rG, []) ~f:begin fun (rg,ls) v ->
             let rg2, l = rdfs rg v [] in

@@ -173,7 +173,7 @@ module Typing = struct
   let pp_id_env : id_env Print.t =
     fun ppf env ->
       let open Print in
-      list_comma (pair string int) ppf (StrMap.to_alist env)
+      list_comma (pair string int) ppf (Map.to_alist env)
   type ty_env = tyvar IntMap.t (* id to tyvar *)
 
   class add_annot = object (self)
@@ -189,8 +189,8 @@ module Typing = struct
         Log.debug begin fun _ ->
           Print.pr "TyENV %s : %a@." (Id.to_string x) pp_hum_tyvar tv
         end;
-        match IntMap.find ty_env x.id with
-        | None -> ty_env <- IntMap.add_exn ty_env ~key:x.id ~data:tv
+        match Map.find ty_env x.id with
+        | None -> ty_env <- Map.add_exn ty_env ~key:x.id ~data:tv
         | Some tv' -> unify tv tv'
 
     method arith : id_env -> raw_hflz -> Arith.t =
@@ -199,12 +199,12 @@ module Typing = struct
         | Var name ->
             let x =
               match
-                StrMap.find id_env name,
-                StrMap.find unbound_ints name
+                Map.find id_env name,
+                Map.find unbound_ints name
               with
               | None, None ->
                   let id = Id.gen_id() in
-                  unbound_ints <- StrMap.add_exn unbound_ints ~key:name ~data:id;
+                  unbound_ints <- Map.add_exn unbound_ints ~key:name ~data:id;
                   Id.{ name; id; ty=`Int }
               | Some id, _ | _, Some id  -> (* the order of match matters! *)
                   Id.{ name; id; ty=`Int }
@@ -225,8 +225,8 @@ module Typing = struct
         | Var name ->
             let id,ty =
               match
-                StrMap.find id_env name,
-                StrMap.find unbound_ints name
+                Map.find id_env name,
+                Map.find unbound_ints name
               with
               | Some id, _ ->
                   id, tv
@@ -236,7 +236,7 @@ module Typing = struct
               | _, _ ->
                   let id = new_id() in
                   unify tv TvInt;
-                  unbound_ints <- StrMap.add_exn unbound_ints ~key:name ~data:id;
+                  unbound_ints <- Map.add_exn unbound_ints ~key:name ~data:id;
                   id, TvInt
             in
             let x = Id.{ name; id; ty=() } in
@@ -289,7 +289,7 @@ module Typing = struct
         Log.debug begin fun _ -> 
           Print.pr "hes_rule.vars %a@." Print.string rule.var
         end;
-        let id   = StrMap.find_exn id_env rule.var in
+        let id   = Map.find_exn id_env rule.var in
         let tv_F = new_tyvar() in
         let _F   = Id.{ name=rule.var; id=id; ty=() } in
         self#add_ty_env _F tv_F;
@@ -328,7 +328,7 @@ module Typing = struct
         let id_env =
           List.fold_left hes ~init:StrMap.empty ~f:begin fun id_env rule ->
             try
-              StrMap.add_exn id_env ~key:rule.var ~data:(new_id())
+              Map.add_exn id_env ~key:rule.var ~data:(new_id())
             with _ ->
               error @@ Fmt.strf "%s is defined twice" rule.var
           end
@@ -359,11 +359,11 @@ module Typing = struct
       | TySigma ty -> ty
 
     method id : unit Id.t -> simple_ty Id.t =
-      fun x -> match IntMap.find ty_env x.id with
+      fun x -> match Map.find ty_env x.id with
         | None -> failwith @@ Fmt.strf "%s" (Id.to_string x)
         | Some ty -> { x with ty = self#ty (Id.to_string x) ty }
     method arg_id : unit arg Id.t -> simple_ty arg Id.t =
-      fun x -> match IntMap.find ty_env x.id with
+      fun x -> match Map.find ty_env x.id with
         | None -> failwith @@ Fmt.strf "%s" (Id.to_string x)
         | Some tv -> { x with ty = self#arg_ty (Id.to_string x) tv }
 
@@ -404,7 +404,7 @@ module Typing = struct
     | main::rest ->
         (* dirty hack for compatibility with Suzuki's impl*)
         let ub_ints =
-          List.map (StrMap.to_alist unbound_ints) ~f:begin
+          List.map (Map.to_alist unbound_ints) ~f:begin
             fun (name,id) -> Id.{name;id;ty=TyInt}
           end
         in
