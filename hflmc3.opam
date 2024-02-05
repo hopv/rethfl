@@ -8,8 +8,9 @@ homepage: "https://github.com/hopv/rethfl"
 bug-reports: "https://github.com/hopv/rethfl/issues"
 depends: [
   "dune" {>= "3.0"}
+  "ocaml" {>= "4.14" & < "5.0"}
   "cmdliner"
-  "core"
+  "core" {>= "v0.16" & < "v0.17"}
   "core_unix"
   "fmt"
   "logs"
@@ -17,9 +18,8 @@ depends: [
   "menhirLib"
   "ppx_compare"
   "ppx_deriving"
-  "ppx_deriving_cmdliner"
   "ppx_let"
-  "ppx_sexp_conv"
+  "ppx_sexp_conv" {>= "v0.16"}
   "odoc" {with-doc}
 ]
 build: [
