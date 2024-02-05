@@ -46,7 +46,7 @@ let check : test_sort -> bool =
       in
       match result with
       (* succsess *)
-      | Ok res when res = sort.succsess ->
+      | Ok res when Hflmc3.equal_result res sort.succsess ->
           Fmt.pf Fmt.stdout "input/ok/%s %f sec@." path_to_show time
       (* failure *)
       | Ok res ->

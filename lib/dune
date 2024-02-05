@@ -5,6 +5,6 @@
     hflmc2_util
     hflmc2_syntax
     hflmc2_typing
-    ))
-
+    )
+ (preprocess (pps ppx_deriving.std)))
 (env (dev (flags (:standard -warn-error -A))))

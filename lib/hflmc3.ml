@@ -11,6 +11,7 @@ let log_src = Logs.Src.create "Main"
 module Log = (val Logs.src_log @@ log_src)
 
 type result = [ `Valid | `Invalid | `Unknown | `Fail]
+  [@@deriving eq]
 
 let show_result = function
   | `Valid      -> "Valid"
