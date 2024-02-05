@@ -23,7 +23,7 @@
           menhirLib
           ppx_compare
           ppx_deriving
-          ;ppx_deriving_cmdliner
+          (ppx_deriving_cmdliner (= "dev"))
           ppx_let
           (ppx_sexp_conv (>= v0.16))
  ))
