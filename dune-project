@@ -2,6 +2,7 @@
 (using menhir 2.0)
 (name hflmc3)
 (generate_opam_files)
+(version 0.1)
 (source (github hopv/rethfl))
 (license Apache-2.0)
 (authors "katsura" "Hogeyama")
