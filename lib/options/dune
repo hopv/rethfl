@@ -1,5 +1,6 @@
 (library
- (public_name hflmc2_options)
+ (name hflmc2_options)
+ (public_name hflmc3.options)
  (libraries
    fmt
    fmt.cli

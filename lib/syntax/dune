@@ -5,7 +5,8 @@
  (modules lexer))
 
 (library
- (public_name hflmc2_syntax)
+ (name hflmc2_syntax)
+ (public_name hflmc3.syntax)
  (libraries
    hflmc2_util
    hflmc2_options

@@ -5,7 +5,8 @@
  (modules lexer))
 
  (library
- (public_name eldarica)
+ (name eldarica)
+ (public_name hflmc3.eldarica)
  (libraries
    menhirLib
  )

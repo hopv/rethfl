@@ -1,5 +1,6 @@
 (library
- (public_name hflmc2_util)
+ (name hflmc2_util)
+ (public_name hflmc3.util)
  (libraries
    core
    core_unix
