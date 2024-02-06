@@ -166,7 +166,7 @@ module Typing = struct
             pp_hum_tyvar x
             pp_hum_tyvar y
           );
-          Fn.fatal @@ Fmt.strf "ill-typed"
+          Fn.fatal @@ Fmt.str "ill-typed"
 
   type id_env = int StrMap.t   (* name to id *)
   (* なんでid_envとty_envの持ち方が違う実装になってるんだろう．これ書いた人バカなのかな？ *)
@@ -330,7 +330,7 @@ module Typing = struct
             try
               Map.add_exn id_env ~key:rule.var ~data:(new_id())
             with _ ->
-              error @@ Fmt.strf "%s is defined twice" rule.var
+              error @@ Fmt.str "%s is defined twice" rule.var
           end
         in
         List.map hes ~f:(self#hes_rule id_env)
@@ -360,11 +360,11 @@ module Typing = struct
 
     method id : unit Id.t -> simple_ty Id.t =
       fun x -> match Map.find ty_env x.id with
-        | None -> failwith @@ Fmt.strf "%s" (Id.to_string x)
+        | None -> failwith @@ Fmt.str "%s" (Id.to_string x)
         | Some ty -> { x with ty = self#ty (Id.to_string x) ty }
     method arg_id : unit arg Id.t -> simple_ty arg Id.t =
       fun x -> match Map.find ty_env x.id with
-        | None -> failwith @@ Fmt.strf "%s" (Id.to_string x)
+        | None -> failwith @@ Fmt.str "%s" (Id.to_string x)
         | Some tv -> { x with ty = self#arg_ty (Id.to_string x) tv }
 
     method term : unit Hflz.t -> simple_ty Hflz.t = function
