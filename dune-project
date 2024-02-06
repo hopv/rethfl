@@ -20,6 +20,7 @@
           fmt
           logs
           lwt
+          menhir
           menhirLib
           ppx_compare
           ppx_deriving
