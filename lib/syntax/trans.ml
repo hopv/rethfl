@@ -282,7 +282,7 @@ module Reduce = struct
               Hflz.fvs rule.body
               |> IdSet.filter ~f:begin fun x -> (* filter nonterminals *)
                   let c = String.get x.Id.name 0 in
-                  c == Char.uppercase c (* XXX ad hoc *)
+                  c == Char.uppercase_ascii c (* XXX ad hoc *)
                  end
             in Id.remove_ty id ,dep
           end
