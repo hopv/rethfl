@@ -58,7 +58,7 @@ let call_fptprove timeout file =
 let selected_cmd timeout = function
   | `Spacer -> call_template [|"z3"; "fp.engine=spacer"|] timeout
   | `Hoice -> call_template [|"hoice"|] timeout
-  | `Eldarica -> call_template [|"eld"|] timeout
+  | `Eldarica -> call_template [|"eld"; "-ssol"|] timeout
   | `Fptprove -> call_fptprove timeout
   | _ -> failwith "you cannot use this"
   
@@ -89,10 +89,7 @@ let get_epilogue =
   | `Eldarica ->
     "\
     (check-sat)
-    (get-model)
     "
-    (* eldarica emits a warning to stderr when (get-model) is called for unstat
-       instances, but this doesn't cause any problem for the get_unsat_proof function *)
 
 let rec collect_preds chcs m = 
   let rec inner rt m = match rt with 
@@ -239,6 +236,12 @@ let parse_model model =
     end
   | _ -> Error "failed to parse model"
 
+let selected_parse_model model = function
+  `Spacer | `Hoice -> parse_model model
+  | `Eldarica -> parse_model ("(model " ^ model ^ ")")
+  | _ -> Error "The model emitted by this solver cannot be parsed"
+
+
 let save_chc_to_smt2 chcs solver = 
     let smt2 = chc2smt2 chcs solver in
     Random.self_init ();
@@ -259,7 +262,7 @@ let check_sat ?(timeout=100000.0) chcs solver =
     | Some ("sat", model) ->
       let open Hflmc2_options in
       if !Typing.show_refinement then
-        `Sat(parse_model model)
+        `Sat(selected_parse_model model solver)
       else
         `Sat(Error "did not calculate refinement. Use --show-refinement")
     | Some ("unknown", _) -> `Unknown
