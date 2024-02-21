@@ -30,6 +30,8 @@ module Typing = struct
   let mode_burn_et_al      = ref (Obj.magic())
   let no_disprove          = ref (Obj.magic())
   let smt_output_dir       = ref (Obj.magic())
+  let annot                = ref (Obj.magic())
+  let target               = ref (Obj.magic())
 end
 
 (******************************************************************************)
@@ -99,6 +101,12 @@ type params =
 
   ; smt_output_dir: string option
     (** Set output dir for smt2 files *)
+
+  ; annot : string [@default ""] [@docs "Typing"] [@docv "annot_file"]
+  (** Annotation file for types *)
+
+  ; target : string [@default ""] [@docs "Typing"]
+  (** Check target *)
   }
   [@@deriving cmdliner,show]
 
@@ -117,6 +125,8 @@ let set_up_params params =
   set_ref Typing.mode_burn_et_al           params.mode_burn_et_al;
   set_ref Typing.no_disprove               params.no_disprove;
   set_ref Typing.smt_output_dir            params.smt_output_dir;
+  set_ref Typing.annot                     params.annot;
+  set_ref Typing.target                    params.target;
   params.input
 
 (******************************************************************************)
@@ -130,7 +140,7 @@ let term_set_up_params () =
 let term_setup_log () =
   (*{{{*)
   let setup style_renderer level =
-    Format.set_margin 100;
+   Format.set_margin 100;
     Fmt_tty.setup_std_outputs ?style_renderer ();
     let pp_header ppf (src, level, header) =
       let src_str =

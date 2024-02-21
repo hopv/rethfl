@@ -132,3 +132,16 @@ let rec top_hflz = function
     Abs(Id.gen x, top_hflz y)
   | Rtype.RInt(RId(x)) -> Var({x with ty=Rtype.(RInt(RId(x)))})
   | Rtype.RInt(RArith(x)) -> Arith(x)
+
+let rec fvs = function
+  | Var x              -> IdSet.singleton x
+  | Bool _             -> IdSet.empty
+  | Or (phi1,phi2,_,_) -> IdSet.union (fvs phi1) (fvs phi2)
+  | And(phi1,phi2,_,_) -> IdSet.union (fvs phi1) (fvs phi2)
+  | App(phi1,phi2,_)   -> IdSet.union (fvs phi1) (fvs phi2)
+  | Abs(x,phi)         -> IdSet.remove (fvs phi) x
+  | Forall (x,phi,_)   -> IdSet.remove (fvs phi) x
+  | Arith a            -> IdSet.of_list @@ List.map ~f:Id.remove_ty @@ Arith.fvs a
+  | Pred (_,as')       -> IdSet.union_list @@ List.map as' ~f:begin fun a ->
+                        IdSet.of_list @@ List.map ~f:Id.remove_ty @@ Arith.fvs a
+                      end

@@ -9,3 +9,6 @@ let add set x = Set.add set (Id.remove_ty x)
 let union = Set.union
 let filter = Set.filter
 let to_list = Set.to_list
+let choose = Set.choose
+let diff = Set.diff
+let elements = Set.elements
