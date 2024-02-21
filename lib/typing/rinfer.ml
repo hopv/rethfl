@@ -1,7 +1,12 @@
-open Rhflz 
+module Options = Rethfl_options
+module P = Parser
+
+open Rhflz
 open Rtype
 open Rethfl_syntax
 open Chc
+
+module Parser = P
 
 (* timer*)
 let measure_time f =
@@ -378,10 +383,11 @@ let print_env (env: Rtype.t IdMap.t) =
 
 type annotation_config = {
   annotated_func: string;
-  annotated_type: Rtype.t;
+  annotated_type: Rtype.t; [@opaque]
   dependencies_annotated_func: string list;
   dependencies_toplevel: string list;
 }
+[@@deriving show]
 
 module StringMap = Map.Make (String)
 
@@ -1092,8 +1098,58 @@ let annotation: annotation_config =
 
   StringMap.find (Sys.getenv "ANNOTATION") annotations
 
+let dependent_funs f (hes : Rhflz.hes) =
+  let fvs f =
+    let { Rhflz.body; _ } = List.find (fun { Rhflz.var; _ } -> Id.eq f var) hes in
+    Rhflz.fvs body
+  in
+  let rec aux checked rest =
+    match IdSet.choose rest with
+    | None -> checked
+    | Some f ->
+      let fvs = fvs f in
+      let rest' = IdSet.remove (IdSet.diff fvs checked) f in
+      let checked' = IdSet.add checked f in
+      aux checked' rest'
+  in
+  aux IdSet.empty (fvs f)
+
+let annotation_of file (hes : hes) =
+  let top_funs = List.map (fun { var; _ } -> var) hes in
+  let open Rethfl_util in
+  let annotated_func,annotated_type =
+    In_channel.with_file file
+      ~f:(fun cin ->
+          cin
+          |> Lexing.from_channel
+          |> Parser.annot Lexer.token)
+  in
+  let annotated_func' = List.find_exn top_funs ~f:(fun f -> f.name = annotated_func) in
+  let dependencies_annotated_func =
+    dependent_funs annotated_func' hes
+    |> IdSet.elements
+    |> List.map ~f:(fun f -> f.Id.name)
+  in
+  let dependencies_toplevel =
+    top_funs
+    |> List.filter_map ~f:(fun var -> if Id.eq var annotated_func' then None else Some var.name)
+  in
+  {
+    annotated_func;
+    annotated_type;
+    dependencies_annotated_func;
+    dependencies_toplevel
+  }
+(*
+let annotation_of file hes =
+  let r = annotation_of file hes  in
+  Format.printf "annotation: %a@." pp_annotation_config r;
+  r
+*)
+
 (* infer with annotations *)
-let infer_based_on_annottations hes (env: Rtype.t IdMap.t) top =
+let infer_based_on_annotations hes (env: Rtype.t IdMap.t) top file =
+  let annotation = annotation_of file hes in
 
   print_env env;
 
@@ -1204,7 +1260,8 @@ let infer_based_on_annottations hes (env: Rtype.t IdMap.t) top =
   | `Fail -> `Fail
   | `Unknown -> `Unknown
 
-let check_annotation hes env top = 
+let check_annotation hes env top file =
+  let annotation = annotation_of file hes in
 
   (* let app = List.find (fun x -> x.var.name = "APP") hes in
   print_string (string_of_rty_skeleton app.var.ty);

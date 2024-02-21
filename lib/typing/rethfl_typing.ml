@@ -4,6 +4,8 @@ module Infer = Rinfer
 module Rhflz = Rhflz
 module Result = Rresult
 module Chc = Chc
+module Parser = Parser
+module Lexer = Lexer
 
 let rec generate_env = function 
   | [] -> Rethfl_syntax.IdMap.empty
@@ -29,8 +31,8 @@ let main x top_old =
   print_newline();
   *)
   let env = generate_env y in
-  match (Sys.getenv_opt "CHECK_TARGET") with
-    | Some("toplevel") -> Infer.infer_based_on_annottations y env top
-    | Some("annotation") -> Infer.check_annotation y env top
-    | None -> Infer.infer y env top
-    | _ -> failwith "Invalid CHECK_TARGET"
+  match !Rethfl_options.Typing.target with
+  | "" -> Infer.infer y env top
+  | "toplevel" -> Infer.infer_based_on_annotations y env top !Rethfl_options.Typing.annot
+  | "annotation" -> Infer.check_annotation y env top !Rethfl_options.Typing.annot
+  | _ -> failwith "Invalid -target"
