@@ -9,14 +9,14 @@ type solver = [`Spacer | `Hoice | `Fptprove | `Eldarica | `Liu]
 
 let fptprove_path_env = "fptprove"
 
-type unsat_proof_node = 
+type unsat_proof_node =
   {
-   id: int; 
-   name: Rid.id; 
-   args: int list; 
+   id: int;
+   name: Rid.id;
+   args: int list;
    nodes: int list }
 type unsat_proof = unsat_proof_node list
-  
+
 let name_of_solver = function
   | `Spacer -> "spacer"
   | `Hoice -> "hoice"
@@ -26,7 +26,7 @@ let name_of_solver = function
 
 let auto = `Auto(`Hoice, [])
 
-let selected_solver size = 
+let selected_solver size =
   let sv = !Typing.solver in
   if size > 1 then `Fptprove
   else if sv = "auto" then auto
@@ -50,15 +50,15 @@ let run_command ?(timeout=20.0) cmd =
   Fn.run_command_with_tmpfiles ~timeout:timeout cmd (f_out, fd_out) (f_err, fd_err)
 
 (* set of template *)
-let call_template cmd timeout = 
+let call_template cmd timeout =
     let open Rethfl_util in
     fun file -> 
     let _, out, _ = run_command ~timeout:timeout (Array.concat [cmd; [|file|]]) in
     String.lsplit2 out ~on:'\n'
 
-let call_fptprove timeout file = 
+let call_fptprove timeout file =
   let open Rethfl_util in
-  let fptprove_path = 
+  let fptprove_path =
     try Sys.getenv "fptprove" with
     | Not_found -> Filename.concat (Sys.getenv "HOME") "bitbucket.org/uhiro/fptprove"
   in
@@ -75,23 +75,23 @@ let selected_cmd timeout = function
   | `Eldarica -> call_template [|"eld"; "-ssol"|] timeout
   | `Fptprove -> call_fptprove timeout
   | _ -> failwith "you cannot use this"
-  
+
 let selected_cex_cmd = function
-  | `Eldarica -> 
+  | `Eldarica ->
     [|"eld"; "-cex";  "-hsmt"|]
   | _ -> failwith "you cannot use this"
 
 let prologue = "(set-logic HORN)
 "
 
-let get_epilogue = 
-  function 
+let get_epilogue =
+  function
   | `Spacer ->
     "\
     (check-sat-using (then propagate-values qe-light horn))
     (get-model)
     "
-  | `Fptprove -> 
+  | `Fptprove ->
     "\
     (check-sat)
     "
@@ -105,8 +105,8 @@ let get_epilogue =
     (check-sat)
     "
 
-let rec collect_preds chcs m = 
-  let rec inner rt m = match rt with 
+let rec collect_preds chcs m =
+  let rec inner rt m = match rt with
   | RTemplate (p, l) -> Rid.M.add p (List.length l) m
   | RAnd(x, y) | ROr(x, y) ->
     m |> inner x |> inner y
@@ -117,23 +117,23 @@ let rec collect_preds chcs m =
   | chc::chcs ->
     m |> inner chc.body |> inner chc.head |> collect_preds chcs
 
-let collect_vars chc = 
+let collect_vars chc =
   let collect_from_arith a m =
     let fvs = Arith.fvs a in
     List.fold_left IdSet.add m fvs
   in
   let rec collect_from_ariths ars m = match ars with
     | [] -> m
-    | x::xs -> 
+    | x::xs ->
       m |> collect_from_arith x |> collect_from_ariths xs
   in
   let rec inner rt m = match rt with
-  | RTemplate(_, l) | RPred(_, l) -> 
+  | RTemplate(_, l) | RPred(_, l) ->
     collect_from_ariths l m
-  | RAnd(x, y) | ROr(x, y) -> 
+  | RAnd(x, y) | ROr(x, y) ->
     m |> inner x |> inner y
   | _ -> m
-  in 
+  in
   IdSet.empty |> inner chc.head |> inner chc.body
 
 
@@ -148,16 +148,16 @@ let gen_assert solver chc =
   else
     Printf.sprintf "(assert (forall (%s) %s))\n" vars_s s
 
-let chc2smt2 chcs solver = 
+let chc2smt2 chcs solver =
   let preds = collect_preds chcs Rid.M.empty in
   let def = preds |> Rid.M.bindings |> List.map pred_def |> List.fold_left (^) "" in
   let body = chcs |> List.map (gen_assert solver) |> List.fold_left (^) "" in
   prologue ^ def ^ body ^ (get_epilogue solver)
 
 
-let parse_model model = 
+let parse_model model =
   let open Rethfl_util in
-  (* Ported from Iwayama san's parser 
+  (* Ported from Iwayama san's parser
      https://github.com/Hogeyama/hflmc2/blob/0c29b0b3a8aacb2496615244b3d93e98370c6eee/lib/refine/hornClauseSolver.ml#L215-L280
   *)
   let open Sexp in
@@ -186,14 +186,14 @@ let parse_model model =
           match ss with
           | [] -> failwith "program error(parse_arith)"
           | [x] -> begin
-              let e = 
-              match op with 
+              let e =
+              match op with
               | Arith.Add | Arith.Sub -> 0
               | Arith.Mult | Arith.Div | Arith.Mod -> 1
               in
               Arith.mk_op op [Arith.Int(e); parse_arith x]
             end
-          | _ -> 
+          | _ ->
             let [@warning "-8"] a::as' = List.map ss ~f:parse_arith in
               List.fold_left ~init:a as' ~f:begin fun a b ->
                 Arith.mk_op op [a; b]
@@ -201,7 +201,7 @@ let parse_model model =
             end
     | s -> fail "parse_arith" s
   in
-  let parse_predicate_name s = 
+  let parse_predicate_name s =
     let tail = String.sub s 1 (String.length s - 1) in
     int_of_string tail
   in
@@ -216,9 +216,9 @@ let parse_model model =
           | ">="  -> `Pred Formula.Ge
           | "<"   -> `Pred Formula.Lt
           | ">"   -> `Pred Formula.Gt
-          | "and" -> `And 
-          | "or"  -> `Or 
-          | "not" -> `Not 
+          | "and" -> `And
+          | "or"  -> `Or
+          | "not" -> `Not
           (* | "forall" -> `Forall (ss) *)
           | var -> `Var var
           | s     -> fail "parse_formula:list" (Atom s)
@@ -229,13 +229,13 @@ let parse_model model =
         | `And ->
             let  [@warning "-8"] a::as' = List.map ss ~f:parse_formula in
             List.fold_left ~init:a as' ~f:(fun x y -> RAnd(x, y))
-        | `Or -> 
+        | `Or ->
             let  [@warning "-8"] a::as' = List.map ss ~f:parse_formula in
             List.fold_left ~init:a as' ~f:(fun x y -> ROr(x, y))
-        | `Not -> 
+        | `Not ->
             let [@warning "-8"] [f] = List.map ss ~f:parse_formula in
             negate_ref f
-        | `Var var -> 
+        | `Var var ->
           RTemplate ((Rid.from_string var , List.map ~f:parse_arith ss))
         end
     | s -> fail "parse_formula" s
@@ -248,7 +248,7 @@ let parse_model model =
         (id, args, body)
     | s -> fail "parse_def" s
   in
-  let simplify defs = 
+  let simplify defs =
     let rec subst_arg vars args form = match (vars, args) with
       | ([], []) -> form
       | (v::vars, x::xs) -> subst_arg vars xs (subst_refinement v (RArith x) form)
@@ -257,7 +257,7 @@ let parse_model model =
     let rec simplify_def x = match x with
       | RAnd(x, y) -> RAnd(simplify_def x, simplify_def y)
       | ROr(x, y) -> ROr(simplify_def x, simplify_def y)
-      | RTemplate((name, args)) -> 
+      | RTemplate((name, args)) ->
         let (_, vars, form) = List.find_exn defs ~f:(fun (name', _, _) -> (Rid.eq name name')) in
         subst_arg vars args form
       | RPred _ | RFalse | RTrue -> x
@@ -269,12 +269,12 @@ let parse_model model =
   in
   print_string model;
   match Sexplib.Sexp.parse model with
-  | Done(model, _) -> begin 
+  | Done(model, _) -> begin
     match model with
     | List (Atom "model" :: sol) ->
         let defs = List.map ~f:parse_def sol in
         Ok(simplify defs)
-    | _ -> Error "parse_model" 
+    | _ -> Error "parse_model"
     end
   | _ -> Error "failed to parse model"
 
@@ -284,7 +284,7 @@ let selected_parse_model model = function
   | _ -> Error "The model emitted by this solver cannot be parsed"
 
 
-let save_chc_to_smt2 chcs solver = 
+let save_chc_to_smt2 chcs solver =
     let smt2 = chc2smt2 chcs solver in
     Random.self_init ();
     let r = Random.int 0x10000000 in
@@ -293,13 +293,14 @@ let save_chc_to_smt2 chcs solver =
       | None -> "/tmp"
     in
     let file = Printf.sprintf "%s/%s-%d.smt2" base (name_of_solver solver) r in
+    Fmt.pr "CHC file: %s@." file;
     let oc = open_out file in
     Printf.fprintf oc "%s" smt2;
     close_out oc;
     file
 
-let check_sat ?(timeout=100000.0) chcs solver = 
-  let check_sat_inner timeout solver = 
+let check_sat ?(timeout=100000.0) chcs solver =
+  let check_sat_inner timeout solver =
     let file = save_chc_to_smt2 chcs solver in
     let open Rethfl_util in
     let f = selected_cmd timeout solver in
@@ -314,12 +315,12 @@ let check_sat ?(timeout=100000.0) chcs solver =
     | Some ("unknown", _) -> `Unknown
     | Some(x, _) -> (Printf.printf "Failed to handle the result of chc solver: %s\n\n" x; `Fail)
     | _ -> (Printf.printf "Failed to handle the result of chc solver\n\n" ; `Fail)
-  in 
+  in
   match solver with
   | `Auto(mainly, tries) ->
-    let rec loop = function 
+    let rec loop = function
       | [] -> check_sat_inner timeout mainly
-      | x::xs -> 
+      | x::xs ->
         begin
           let ret = check_sat_inner 1.0 x in
           match ret with
@@ -330,18 +331,18 @@ let check_sat ?(timeout=100000.0) chcs solver =
   | `Spacer | `Hoice | `Eldarica | `Fptprove as sv -> check_sat_inner timeout sv
 
 (* usp: unsat proof *)
-let rec unsat_proof_of_eldarica_cex nodes = 
+let rec unsat_proof_of_eldarica_cex nodes =
   let open Eldarica in
   match nodes with
   | [] -> []
-  | x::xs -> {id=Dag.(x.id); 
-              name=if x.head="FALSE" then 
-                Rid.false_id 
-               else 
+  | x::xs -> {id=Dag.(x.id);
+              name=if x.head="FALSE" then
+                Rid.false_id
+               else
                 Rid.from_string Dag.(x.head);
               args=Dag.(x.args);
               nodes=[];}::(unsat_proof_of_eldarica_cex xs) (* TODO *)
-let get_unsat_proof ?(timeout=100.0) chcs solver = 
+let get_unsat_proof ?(timeout=100.0) chcs solver =
   let open Rethfl_util in
   let file = save_chc_to_smt2 chcs solver in
   let cmd = selected_cex_cmd solver in
