@@ -85,10 +85,10 @@ type params =
   (* Refine *)
   ; refine_legacy : bool [@default false] [@docs "Refine"]
     (** Use old refine algorithm *)
-  
+
   (* Typing *)
   ; solver : string [@default "auto"] [@docs "Typing"] [@docv "solver_name"]
-  (** Choose background CHC solver. Available: auto z3, hoice, eldarica, fptprover *)
+  (** Choose background CHC solver. Available: auto, z3, hoice, eldarica, fptprover *)
 
   ; show_refinement: bool [@default false] [@docs "Typing"] [@docv "show refinement"]
   (** Show refinement types. This sometimes fails because of parsing the solution from CHC solver... *)
@@ -187,4 +187,3 @@ let parse ?argv () : input option =
   | `Ok [file] -> Some (`File file)
   | `Ok _ -> Fn.todo ~info:"multiple input files" ()
   | _     -> None
-

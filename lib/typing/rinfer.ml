@@ -44,11 +44,11 @@ let rec rty = function
   | RBool(phi) -> phi
   | _ -> failwith "program error(rty)"
 
-let add_constraint x m = 
+let add_constraint x m =
   match x.head with
   | RTemplate(p, l) ->
   begin
-    let rec find_template = function 
+    let rec find_template = function
       | RTemplate(p', l') when p = p' && l = l' -> true
       | RAnd(x, y) -> find_template x || find_template y
       | _ -> false
@@ -60,7 +60,7 @@ let add_constraint x m =
 (* check whether t <= t' holds *)
 let rec _subtype t t' renv m =
   match (t, t') with
- | RBool(p), RBool(p') -> 
+ | RBool(p), RBool(p') ->
     add_constraint ({body=conjoin renv p'; head=p}) m
  | RArrow(RInt(RId(x)), t), RArrow(RInt(RId(y)), t')  ->
    (* substitute generate new variable and substitute t and t' by the new var *)
@@ -69,14 +69,14 @@ let rec _subtype t t' renv m =
    let t2' = subst y v t' in
    _subtype t2 t2' renv m
  | RArrow(t, s), RArrow(t', s') ->
-   let m' = 
+   let m' =
    if !Rethfl_options.Typing.mode_burn_et_al then
      _subtype t' t renv m
    else
      _subtype t' t (conjoin renv (rty s')) m
    in
-   _subtype s s' renv m' 
- | _, _ -> 
+   _subtype s s' renv m'
+ | _, _ ->
    print_rtype t;
    Printf.printf "=";
    print_rtype t';
@@ -86,11 +86,11 @@ let rec _subtype t t' renv m =
 let subtype t t' m = _subtype t t' RTrue m
 
 (* track: tracking And/Forall to track counterexample *)
-let rec infer_formula track formula env m ints = 
+let rec infer_formula track formula env m ints =
   match formula with
   | Bool b when b -> (RBool(RTrue), m)
   | Bool _ -> (RBool(RFalse), m)
-  | Var id -> 
+  | Var id ->
     begin
     match IdMap.find env id with
     | Some(t) -> (t, m)
@@ -98,26 +98,26 @@ let rec infer_formula track formula env m ints =
     Printf.printf "not found: %s" id.name;
     failwith "no var(infer_formula)"
     end
-  | Abs (arg, body) -> 
+  | Abs (arg, body) ->
     let env' = IdMap.set env arg arg.ty in
-    let ints' = 
+    let ints' =
       begin
       match arg.ty with
-      | RInt (RId(i)) -> 
+      | RInt (RId(i)) ->
         Arith.Var(i)::ints
-      | _ -> ints 
+      | _ -> ints
       end
     in
     let (body_t, l) = infer_formula track body env' m ints' in
     (RArrow(arg.ty, body_t), l)
   | Forall(arg, body, template) ->
     let env' = IdMap.set env arg arg.ty in
-    let ints' = 
+    let ints' =
       begin
       match arg.ty with
-      | RInt (RId(i)) -> 
+      | RInt (RId(i)) ->
         Arith.Var(i)::ints
-      | _ -> ints 
+      | _ -> ints
       end
     in
     let (body_t, l) = infer_formula track body env' m ints' in
@@ -132,15 +132,15 @@ let rec infer_formula track formula env m ints =
     let (rx, ry) = match (x', y') with
       | (RBool(rx), RBool(ry)) -> (rx, ry)
       | _ -> failwith "type is not correct"
-    in 
+    in
     RBool(ROr(rx, ry)), m'
-  | And (x, y, t1, t2) -> 
+  | And (x, y, t1, t2) ->
     let (x', mx) = infer_formula track x env m ints in
     let (y', m') = infer_formula track y env mx ints in
     let (rx, ry) = match (x', y') with
       | (RBool(rx), RBool(ry)) -> (rx, ry)
       | _ -> failwith "type is not correct"
-    in 
+    in
     if track then
       let tx = RBool(RTemplate(t1)) in
       let mx = subtype (RBool(rx)) tx m' in
@@ -149,7 +149,7 @@ let rec infer_formula track formula env m ints =
       RBool(RAnd(RTemplate(t1), RTemplate(t2))), my
     else
       RBool(RAnd(rx, ry)), m'
-  | App(x, y, _) -> 
+  | App(x, y, _) ->
     let (x', mx) = infer_formula track x env m ints in
     let (y', m') = infer_formula track y env mx ints in
     let (arg, body, tau) = match (x', y') with
@@ -157,10 +157,10 @@ let rec infer_formula track formula env m ints =
       | _ -> failwith "type is not correct"
     in begin
       match (arg, tau) with
-       | RInt(RId(id)), RInt m -> 
+       | RInt(RId(id)), RInt m ->
          (subst id m body, m')
        | _ ->
-        let body' = clone_type_with_new_pred ints body in 
+        let body' = clone_type_with_new_pred ints body in
         (*
         print_string "subtyping...";
         print_rtype @@ RArrow(arg, body); print_string " =? "; print_rtype @@ RArrow(tau, body'); print_newline();
@@ -168,8 +168,8 @@ let rec infer_formula track formula env m ints =
         let m'' = subtype (RArrow(arg, body)) (RArrow(tau, body')) m' in
         (body', m'')
       end
-  
-let infer_rule track (rule: hes_rule) env (chcs: (refinement, refinement) chc list): (refinement, refinement) chc list = 
+
+let infer_rule track (rule: hes_rule) env (chcs: (refinement, refinement) chc list): (refinement, refinement) chc list =
   print_newline();
   print_newline();
   print_string "infering new formula: ";
@@ -183,24 +183,24 @@ let infer_rule track (rule: hes_rule) env (chcs: (refinement, refinement) chc li
   print_string "[Result]\n";
   print_constraints m;
   m
- 
+
 let rec infer_hes ?(track=false) (hes: hes) env (accum_constraints: (refinement, refinement) chc list): (refinement, refinement) chc list = match hes with
   | [] -> accum_constraints
-  | rule::xs -> 
-    infer_rule track rule env accum_constraints |> infer_hes ~track:track xs env 
+  | rule::xs ->
+    infer_rule track rule env accum_constraints |> infer_hes ~track:track xs env
 
 let rec print_hes = function
   | [] -> ()
-  | hes_rule::xs -> 
+  | hes_rule::xs ->
     print_string hes_rule.var.name;
     print_string " ";
     print_rtype hes_rule.var.ty;
     print_newline ();
     print_hes xs
-  
+
 let rec dnf_size = function
   | [] -> 0
-  | x::xs -> 
+  | x::xs ->
     let x = ref2dnf x.head |> List.length in
     let y = dnf_size xs in
     if x > y then x else y
@@ -210,37 +210,37 @@ let simplify = normalize
 let print_derived_refinement_type is_dual_chc hes constraints =
   let rec gen_name_type_map constraints m = match constraints with
     | [] -> m
-    | (id, args, body)::xs -> 
+    | (id, args, body)::xs ->
       m |> Rid.M.add id (args, body) |> gen_name_type_map xs
   in
   let m =
     gen_name_type_map constraints Rid.M.empty
     |> Rid.M.map (fun (args, fml) -> args, if is_dual_chc then Rtype.dual fml else fml) in
    let rec subst_ids map t =
-    match map with 
+    match map with
     | [] -> t
-    | (src, dst):: xs -> 
+    | (src, dst):: xs ->
       t |> subst_refinement src (RArith dst) |> subst_ids xs
   in
-  let rec zip l r = match (l, r) with 
+  let rec zip l r = match (l, r) with
     | [], [] -> []
     | [], _ | _ , [] -> failwith "program error(print_derived_refinement_type)"
     | x::xs, y::ys -> (x, y)::zip xs ys
   in
-  let rec translate_ty = function 
+  let rec translate_ty = function
     | RArrow (x, y) -> RArrow(translate_ty x, translate_ty y)
-    | RBool(RTemplate(p, l)) -> 
+    | RBool(RTemplate(p, l)) ->
       let (args, body) = Rid.M.find p m in
       let map = zip args l in
       let body' = subst_ids map body in
       RBool(body')
     | x -> x
   in
-  let rec inner = 
+  let rec inner =
     let open Rhflz in
     function
     | [] -> []
-    | rule::hes -> 
+    | rule::hes ->
       let rule = {rule with var={rule.var with ty=translate_ty rule.var.ty}} in
       rule :: inner hes
   in
@@ -252,56 +252,56 @@ Output: Valid/Invalid/Fail/Unknown
 
 [inference]
 1. generate constraints
-2. optimize CHC (ECHC) 
+2. optimize CHC (ECHC)
 3. check satisfiability
 if sat then return Valid
 if unsat then returns check_feasibility
 
 [check_feasibility]
 1. generate constraints by using predicates for tracking cex
-2. generate unsat_proof 
+2. generate unsat_proof
 3. evaluate HFL formula along the proof
 4. if the input is evaluated to false then returns Invalid
 5. otherwise; returns Unknown
 *)
-let infer hes env top = 
-  let hes = List.map (fun x -> 
-    let open Rhflz in 
-     {x with body=Rhflz.translate_if x.body}) hes 
+let infer hes env top =
+  let hes = List.map (fun x ->
+    let open Rhflz in
+     {x with body=Rhflz.translate_if x.body}) hes
   in
-  let call_solver_with_timer hes solver = 
+  let call_solver_with_timer hes solver =
     add_mesure_time "CHC Solver" @@ fun () ->
     Chc_solver.check_sat hes solver
   in
-  let check_feasibility chcs = 
+  let check_feasibility chcs =
     (* 1. generate constraints by using predicates for tracking cex *)
     let p = Chc_solver.get_unsat_proof chcs `Eldarica in
     let open Disprove in
     match disprove p hes env top with
     | `Invalid -> `Unsat
     | `Unknown -> `Unknown
-  in 
+  in
   (* CHC Size is 1, then it is tractable *)
   (* size: intersection type size *)
   let rec try_intersection_type chcs size =
-    (* 
+    (*
       if sat then return Valid
       if unsat then returns check_feasibility
     *)
     match call_solver_with_timer chcs (Chc_solver.selected_solver 1) with
     | `Unsat when !Rethfl_options.Typing.no_disprove -> `Unknown
-    | `Unsat -> check_feasibility chcs     
+    | `Unsat -> check_feasibility chcs
     | `Sat(x) -> `Sat(x)
     | `Fail -> `Fail
     | `Unknown -> `Unknown
-  and infer_main ?(size=1) hes env top = 
+  and infer_main ?(size=1) hes env top =
     (* 1. generate constraints *)
     print_hes hes;
     let top_pred = get_top @@ Rethfl_syntax.Id.(top.ty) in
     let constraints = infer_hes hes env [{head=RTemplate(top_pred); body=RTrue}] in
     (*print_constraints constraints;*)
     (* 2. optimize CHC (ECHC) *)
-    let constraints = List.map (fun chc -> 
+    let constraints = List.map (fun chc ->
       {chc with head=translate_if chc.head}
     ) constraints in
 
@@ -342,15 +342,15 @@ let infer hes env top =
   let is_dual_chc, x = infer_main hes env top in
   report_times ();
   match x with
-  | `Sat(x) -> 
-      begin 
-        match x with 
-        | Ok(x) -> 
+  | `Sat(x) ->
+      begin
+        match x with
+        | Ok(x) ->
           let open Rethfl_options in
           let hes = print_derived_refinement_type is_dual_chc hes x in
           if !Typing.show_refinement then
             print_hes hes
-          else 
+          else
             ()
         | Error(s) -> Printf.printf "%s\n" s
       end;
@@ -370,7 +370,7 @@ let print_refinements (constraints: (int * [> `Int ] Id.t list * refinement) lis
     ()
   )) constraints;
   print_endline "[Refinements end]"
-  
+
 
 let print_env (env: Rtype.t IdMap.t) =
   print_string "[print_env:start]\n";
@@ -398,8 +398,8 @@ let rec string_of_rty_skeleton (rty: Rtype.t) =
     | RInt(_) -> "RInt(RId Rethfl_syntax.Id.(gen ~name:\"x\" `Int))"
 
 let annotation: annotation_config =
-  if Option.is_none (Sys.getenv_opt "ANNOTATION") then Obj.magic () else 
-  let annotation_sum = 
+  if Option.is_none (Sys.getenv_opt "ANNOTATION") then Obj.magic () else
+  let annotation_sum =
     let var_n = Rethfl_syntax.Id.gen ~name:"n" `Int in
     let var_s = Rethfl_syntax.Id.gen ~name:"s" `Int in
     RArrow(RInt(RId var_n),
@@ -496,7 +496,7 @@ let annotation: annotation_config =
       RPred(Formula.Le, [lower; mid]),
       RPred(Formula.Lt, [mid; upper])
     ) in
-  
+
   let annotation_kmp_loopShift = {
     dependencies_toplevel = ["MAIN_1425"; "LOOPSHIFT"; "LOOP"; "MAKE_ARRAY"];
     dependencies_annotated_func = ["LOOPSHIFT"];
@@ -566,7 +566,7 @@ let annotation: annotation_config =
                         RPred(Formula.Lt, [Arith.Int 0; Arith.Var var_plen]);
                         inrange (Arith.Int (-1)) (Arith.Var var_i) (Arith.Op (Arith.Sub, [Arith.Var var_plen; Arith.Int 2]));
                         inrange (Arith.Op (Arith.Add, [Arith.Var var_i; Arith.Int 1])) (Arith.Var var_j) (Arith.Var var_plen);
-                      ]  
+                      ]
                     )
                   )
                 )
@@ -651,7 +651,7 @@ let annotation: annotation_config =
                           RPred(Formula.Lt, [Arith.Int 0; Arith.Var var_slen]);
                           inrange (Arith.Int 0) (Arith.Var var_p) (Arith.Var var_plen);
                           inrange (Arith.Int 0) (Arith.Var var_s) (Arith.Var var_slen);
-                        ]  
+                        ]
                       )
                     )
                   )
@@ -673,7 +673,7 @@ let annotation: annotation_config =
         let var_x = Rethfl_syntax.Id.gen ~name:"x" `Int in
         let var_y = Rethfl_syntax.Id.gen ~name:"y" `Int in
         RArrow(
-          RInt(RId var_x), 
+          RInt(RId var_x),
           RArrow(
             RArrow(
               RInt(RId var_y),
@@ -740,7 +740,7 @@ let annotation: annotation_config =
         let var_x = Rethfl_syntax.Id.gen ~name:"x" `Int in
         let var_y = Rethfl_syntax.Id.gen ~name:"y" `Int in
         RArrow(
-          RInt(RId var_x), 
+          RInt(RId var_x),
           RArrow(
             RArrow(
               RInt(RId var_y),
@@ -799,7 +799,7 @@ let annotation: annotation_config =
                 RArrow(
                   RArrow(
                     RArrow(
-                      RInt(RId var_x), 
+                      RInt(RId var_x),
                       RArrow(
                         RArrow(
                           RInt(RId var_y),
@@ -851,7 +851,7 @@ let annotation: annotation_config =
                 RArrow(
                   RArrow(
                     RArrow(
-                      RInt(RId var_x), 
+                      RInt(RId var_x),
                       RArrow(
                         RArrow(
                           RInt(RId var_y),
@@ -1028,9 +1028,8 @@ let annotation: annotation_config =
     annotated_func = "APP";
     annotated_type =
         let intid () = RInt(RId (Rethfl_syntax.Id.gen ~name:"x" `Int)) in
-        let rty_fin () = 
+        let rty_fin () =
           let var_sff = Rethfl_syntax.Id.gen ~name:"sff" `Int in
-
                 RArrow(
                   RInt(RId var_sff),
                   RArrow(
@@ -1078,7 +1077,7 @@ let annotation: annotation_config =
         RArrow(intid (), RArrow(intid (), RArrow(intid (), rty_fin ())))
         )
     ))))))))
-  } in 
+  } in
 
   let annotations = StringMap.of_seq @@ List.to_seq [
     (* ("SUM", annotation_sum); *)
@@ -1161,45 +1160,45 @@ let infer_based_on_annotations hes (env: Rtype.t IdMap.t) top file =
 
   print_env env;
 
-  let hes = List.map (fun x -> 
-    let open Rhflz in 
-      {x with body=Rhflz.translate_if x.body}) hes 
+  let hes = List.map (fun x ->
+    let open Rhflz in
+      {x with body=Rhflz.translate_if x.body}) hes
   in
   let hes = List.filter (fun x -> x.var.name <> annotation.annotated_func && List.exists (fun s -> s = x.var.name) annotation.dependencies_toplevel) hes in
   print_hes hes;
-  let call_solver_with_timer hes solver = 
+  let call_solver_with_timer hes solver =
     add_mesure_time "CHC Solver" @@ fun () ->
     Chc_solver.check_sat hes solver
   in
-  let check_feasibility chcs = 
+  let check_feasibility chcs =
     (* 1. generate constraints by using predicates for tracking cex *)
     let p = Chc_solver.get_unsat_proof chcs `Eldarica in
     let open Disprove in
     match disprove p hes env top with
     | `Invalid -> `Unsat
     | `Unknown -> `Unknown
-  in 
+  in
   (* CHC Size is 1, then it is tractable *)
   (* size: intersection type size *)
   let rec try_intersection_type chcs size =
-    (* 
+    (*
       if sat then return Valid
       if unsat then returns check_feasibility
     *)
     match call_solver_with_timer chcs (Chc_solver.selected_solver 1) with
     | `Unsat when !Rethfl_options.Typing.no_disprove -> `Unknown
-    | `Unsat -> check_feasibility chcs     
+    | `Unsat -> check_feasibility chcs
     | `Sat(x) -> `Sat(x)
     | `Fail -> `Fail
     | `Unknown -> `Unknown
-  and infer_main ?(size=1) hes env top = 
+  and infer_main ?(size=1) hes env top =
     (* 1. generate constraints *)
     print_hes hes;
     let top_pred: Rtype.template = get_top @@ Rethfl_syntax.Id.(top.ty) in
     let constraints = infer_hes hes env [{head=RTemplate(top_pred); body=RTrue}] in
     (*print_constraints constraints;*)
     (* 2. optimize CHC (ECHC) *)
-    let constraints = List.map (fun chc -> 
+    let constraints = List.map (fun chc ->
       {chc with head=translate_if chc.head}
     ) constraints in
 
@@ -1241,17 +1240,17 @@ let infer_based_on_annotations hes (env: Rtype.t IdMap.t) top file =
   let (is_dual_chc, x) = infer_main hes env top in
   report_times ();
   match x with
-  | `Sat(x) -> 
-      begin 
+  | `Sat(x) ->
+      begin
         (* Note: --show-refinement つけないと実行されません *)
-        match x with 
-        | Ok(x) -> 
+        match x with
+        | Ok(x) ->
           (* print_refinements x; *)
           let open Rethfl_options in
           let hes = print_derived_refinement_type is_dual_chc hes x in
           if !Typing.show_refinement then
             print_hes hes
-          else 
+          else
             ()
         | Error(s) -> Printf.printf "%s\n" s
       end;
@@ -1280,53 +1279,53 @@ let check_annotation hes env top file =
   (* END: specify type of SUM in env *)
 
   let top = (List.find (fun x -> x.var.name = annotation.annotated_func) hes).var in
-  let hes = List.map (fun x -> 
-    let open Rhflz in 
-      {x with body=Rhflz.translate_if x.body}) hes 
+  let hes = List.map (fun x ->
+    let open Rhflz in
+      {x with body=Rhflz.translate_if x.body}) hes
   in
 
   (* remove unrelated rules *)
   let hes = List.filter (fun x -> List.exists (fun s -> s = x.var.name) annotation.dependencies_annotated_func) hes in
 
   (* modify the expected type of SUM in hes *)
-  let hes = List.map (fun x -> 
+  let hes = List.map (fun x ->
     if x.var.name = annotation.annotated_func then (
       {x with var={x.var with ty=annotation.annotated_type}}
     ) else x
   ) hes in
   (* END: modify the expected type of SUM in hes *)
-  let call_solver_with_timer hes solver = 
+  let call_solver_with_timer hes solver =
     add_mesure_time "CHC Solver" @@ fun () ->
     Chc_solver.check_sat hes solver
   in
-  let check_feasibility chcs = 
+  let check_feasibility chcs =
     (* 1. generate constraints by using predicates for tracking cex *)
     let p = Chc_solver.get_unsat_proof chcs `Eldarica in
     let open Disprove in
     match disprove p hes env top with
     | `Invalid -> `Unsat
     | `Unknown -> `Unknown
-  in 
+  in
   (* CHC Size is 1, then it is tractable *)
   (* size: intersection type size *)
   let rec try_intersection_type chcs size =
-    (* 
+    (*
       if sat then return Valid
       if unsat then returns check_feasibility
     *)
     match call_solver_with_timer chcs (Chc_solver.selected_solver 1) with
     | `Unsat when !Rethfl_options.Typing.no_disprove -> `Unknown
-    | `Unsat -> check_feasibility chcs     
+    | `Unsat -> check_feasibility chcs
     | `Sat(x) -> `Sat(x)
     | `Fail -> `Fail
     | `Unknown -> `Unknown
-  and infer_main ?(size=1) hes env top = 
+  and infer_main ?(size=1) hes env top =
     (* 1. generate constraints *)
     print_hes hes;
     let constraints = infer_hes hes env [] in
     (*print_constraints constraints;*)
     (* 2. optimize CHC (ECHC) *)
-    let constraints = List.map (fun chc -> 
+    let constraints = List.map (fun chc ->
       {chc with head=translate_if chc.head}
     ) constraints in
 
@@ -1368,15 +1367,15 @@ let check_annotation hes env top file =
   let (is_dual_chc, x) = infer_main hes env top in
   report_times ();
   match x with
-  | `Sat(x) -> 
-      begin 
-        match x with 
-        | Ok(x) -> 
+  | `Sat(x) ->
+      begin
+        match x with
+        | Ok(x) ->
           let open Rethfl_options in
           let hes = print_derived_refinement_type is_dual_chc hes x in
           if !Typing.show_refinement then
             print_hes hes
-          else 
+          else
             ()
         | Error(s) -> Printf.printf "%s\n" s
       end;
@@ -1384,5 +1383,3 @@ let check_annotation hes env top file =
   | `Unsat -> `Unsat
   | `Fail -> `Fail
   | `Unknown -> `Unknown
-  
-  

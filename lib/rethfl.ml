@@ -83,4 +83,3 @@ let main file =
     end
   | None -> print_string "[Warn]input was empty\n";
       `Valid (* because the input is empty *)
-

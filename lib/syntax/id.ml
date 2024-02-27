@@ -35,4 +35,3 @@ module Key = struct
   let compare : t -> t -> int = compare Core.Unit.compare
   let hash : t -> int = String.hash <<< to_string
 end
-
