@@ -91,4 +91,3 @@ let rec abstract : abstraction_ty -> abstracted_ty = function
 let rec arity_of_abstracted_ty : abstracted_ty -> int = function
   | ATyBool -> 0
   | ATyArrow(_, aty) -> 1 + arity_of_abstracted_ty aty
-

@@ -9,16 +9,16 @@ let id_top = 0
 let created = ref false
 let generate_id () = id_source := !id_source + 1; !id_source
 let generate_template args = (generate_id (), List.map (fun x -> Arith.Var(x)) args)
-let generate_top_template args  = 
+let generate_top_template args  =
   if !created then
     failwith "You attempted to create top template twice"
   else
     created := true;
     (id_top, args)
-  
+
 let rec print_ariths = function
   | [] -> ()
-  | [x] -> 
+  | [x] ->
     Print.arith Fmt.stdout x;
     Fmt.flush Fmt.stdout () ;
   | x::xs ->
@@ -27,7 +27,7 @@ let rec print_ariths = function
     print_string ",";
     print_ariths xs
 
-let print_template (id, l) = 
+let print_template (id, l) =
   Printf.printf "X%d(" id;
   print_ariths l;
   print_string ")"
@@ -35,7 +35,7 @@ let print_template (id, l) =
 type rint =
   | RId of [`Int] Id.t
   | RArith of Arith.t
-and t 
+and t
   = RBool of refinement
   | RArrow of t * t
   | RInt of rint
@@ -58,40 +58,40 @@ let rec clone_type_with_new_pred ints = function
       RBool(RTemplate(generate_id (), ints))
     end
   | RArrow(RInt(RId(id)), y) ->
-    RArrow(RInt(RId(id)), clone_type_with_new_pred (Arith.Var(id)::ints) y) 
-  | RArrow(x, y) -> 
+    RArrow(RInt(RId(id)), clone_type_with_new_pred (Arith.Var(id)::ints) y)
+  | RArrow(x, y) ->
     RArrow(clone_type_with_new_pred ints x, clone_type_with_new_pred ints y)
   | x -> x
 
 let print_rint = function
-  | RId x -> 
+  | RId x ->
     Print.id Fmt.stdout x;
-    Fmt.flush Fmt.stdout () 
-  | RArith x -> 
+    Fmt.flush Fmt.stdout ()
+  | RArith x ->
     Print.arith Fmt.stdout x;
-    Fmt.flush Fmt.stdout () 
+    Fmt.flush Fmt.stdout ()
 
 let rec print_refinement = function
   | RTrue -> Printf.printf "tt"
   | RFalse -> Printf.printf "ff"
-  | RPred (x,[f1; f2]) -> 
+  | RPred (x,[f1; f2]) ->
     Print.arith Fmt.stdout f1;
     Print.pred Fmt.stdout x;
     Print.arith Fmt.stdout f2;
     Fmt.flush Fmt.stdout () ;
-  | RPred (x,_) -> 
+  | RPred (x,_) ->
     Print.pred Fmt.stdout x;
     Fmt.flush Fmt.stdout () ;
-  | RAnd(x, y) -> 
+  | RAnd(x, y) ->
     print_string "(";
-    print_refinement x; 
-    Printf.printf " /\\ "; 
+    print_refinement x;
+    Printf.printf " /\\ ";
     print_refinement y;
     print_string ")";
-  | ROr(x, y) -> 
+  | ROr(x, y) ->
     print_string "(";
-    print_refinement x; 
-    Printf.printf " \\/ "; 
+    print_refinement x;
+    Printf.printf " \\/ ";
     print_refinement y;
     print_string ")";
   | RTemplate t -> print_template t
@@ -106,7 +106,7 @@ let rec print_rtype = function
     print_string ")";
   | RInt x -> print_rint x; Printf.printf ": int"
 
-  
+
 let rint2arith = function
   | RId x -> Arith.Var(x)
   | RArith x -> x
@@ -125,8 +125,8 @@ let disjoin x y =
   else if y = RTrue then RTrue
   else ROr(x, y)
 
-let subst_ariths id rint l = match rint with 
-  | RId id' -> 
+let subst_ariths id rint l = match rint with
+  | RId id' ->
     List.map (Trans.Subst.Arith.arith id (Arith.Var(id'))) l
   | RArith a ->
     List.map (Trans.Subst.Arith.arith id a) l
@@ -146,16 +146,16 @@ let rec subst id rint = function
 (* tuple of ids of substitution *)
 let rec subst_refinement_with_ids body l = match l with
   | [] -> body
-  | (x, y):: xs -> 
+  | (x, y):: xs ->
     subst_refinement_with_ids (subst_refinement x y body) xs
 
 (* check if refinement contains template *)
-let rec does_contain_pred = function 
+let rec does_contain_pred = function
   | RTemplate _ -> true
   | RAnd(x, y) | ROr(x, y) -> does_contain_pred x || does_contain_pred y
   | _ -> false
-  
-let rec count_preds = function 
+
+let rec count_preds = function
   | RTemplate _ -> 1
   | RAnd(x, y) | ROr(x, y) -> count_preds x + count_preds y
   | _ -> 0
@@ -190,18 +190,18 @@ let m n = assert(h n)
 H x =v (x >= 0 /\ G x) \/ (x < 0 /\ F x)
 S n =v H n
 
-Then this formula will generate chc formulas, at least one of which has a head which contains 
+Then this formula will generate chc formulas, at least one of which has a head which contains
 more than one or.
 To remedy this problem, the above "gadget" of formula can automatically be translated to the following.
 H x =v (x < 0 \/ G x) /\ (x >= 0 /\ F x)
 S n =v H n
 And this is what The following function does.
 
-And for the speed of translation, I did not use the complete algorithm for this, just checking 
+And for the speed of translation, I did not use the complete algorithm for this, just checking
 the negation of one formula is equal to the other.
 *)
 
-let rec translate_if = 
+let rec translate_if =
   function
   | ROr(RAnd(a, b), RAnd(a', b')) ->
     let fa = does_contain_pred a |> not in
@@ -216,14 +216,14 @@ let rec translate_if =
       RAnd(ROr(a', translate_if a), ROr(b, translate_if b'))
    else if fb && fb' && negate_ref b = b' then
       RAnd(ROr(b', translate_if a), ROr(b, translate_if a'))
-    else 
+    else
       ROr(RAnd(translate_if a, translate_if b), RAnd(translate_if a', translate_if b'))
   | ROr(x, y) -> ROr(translate_if x, translate_if y)
   | RAnd(x, y) -> RAnd(translate_if x, translate_if y)
   | x -> x
 
 
-let rec to_bottom = function 
+let rec to_bottom = function
   | RArrow(x, y) -> RArrow(to_top x, to_bottom y)
   | RBool _ -> RBool RFalse
   | RInt(x) -> RInt(x)
@@ -238,16 +238,16 @@ let rec get_top = function
   | _ -> failwith "program error" (* should not occur int *)
 
 let rec simplify x = match x with
-  | RPred(p, l) -> begin match Formula.simplify_pred p l with 
+  | RPred(p, l) -> begin match Formula.simplify_pred p l with
     | Some(true) -> RTrue
     | Some(false) -> RFalse
     | None -> x
     end
-  | RAnd(x, y) -> 
+  | RAnd(x, y) ->
     let x' = simplify x in
     let y' = simplify y in
     conjoin x' y'
-  | ROr(x, y) -> 
+  | ROr(x, y) ->
     let x' = simplify x in
     let y' = simplify y in
     disjoin x' y'
