@@ -3,6 +3,8 @@ open Hflmc2_util
 include Fmt
 include Format
 
+let print = Fn.print
+
 let semicolon : unit Fmt.t = fun ppf () -> string ppf ";"
 
 let list_comma : 'a Fmt.t -> 'a list Fmt.t =
@@ -32,7 +34,8 @@ module Prec = struct
   let add   = 6
   let mult  = 7
   let neg   = 9
-  let app   = 10
+  let cons  = 10
+  let app   = 11
 
   let of_op = function
     | Arith.Add -> add
@@ -40,6 +43,7 @@ module Prec = struct
     | Arith.Mult -> mult
     | Arith.Div -> mult
     | Arith.Mod -> mult
+  let of_cons = cons
   let op_is_leftassoc = function
     | Arith.Add -> true
     | Arith.Sub -> true
@@ -94,6 +98,9 @@ let op : Arith.op t =
 let op_ : Arith.op t_with_prec =
   ignore_prec op
 
+let cons =
+  fun ppf _ -> Fmt.string ppf "::"
+
 let rec gen_arith_ : 'avar t_with_prec -> 'avar Arith.gen_t t_with_prec =
   fun avar_ prec ppf a -> match a with
     | Int n -> Fmt.int ppf n
@@ -116,6 +123,25 @@ let arith_ : Prec.t -> Arith.t Fmt.t =
   fun prec ppf a -> gen_arith_ id_ prec ppf a
 let arith : Arith.t Fmt.t = arith_ Prec.zero
 
+
+let rec gen_ls_arith_ : 'var t_with_prec -> ('avar, 'lvar) Arith.gen_lt t_with_prec =
+  fun avar_ prec ppf a -> match a with
+    | Nil -> Fmt.string ppf "[]"
+    | LVar x -> Fmt.string ppf (Id.to_string x)
+    | Cons (hd, tl) ->
+      let op_prec = Prec.of_cons in
+      let prec_l = op_prec in
+      let prec_r = Prec.succ op_prec in
+      show_paren (prec > op_prec) ppf "@[<1>%a@ %a@ %a@]"
+          (gen_arith_ avar_ prec_l) hd
+          cons ()
+          (gen_ls_arith_ avar_ prec_l) tl
+let gen_ls_arith : 'var t_with_prec -> ('avar, 'lvar) Arith.gen_lt t =
+  fun avar_ ppf a -> gen_ls_arith_ avar_ Prec.zero ppf a
+let ls_arith_ : Prec.t -> Arith.lt Fmt.t =
+  fun prec ppf a -> gen_ls_arith_ id_ prec ppf a
+let ls_arith : Arith.lt Fmt.t = ls_arith_ Prec.zero
+
 (* Formula *)
 
 let pred : Formula.pred t =
@@ -129,10 +155,18 @@ let pred : Formula.pred t =
 let pred_ : Formula.pred t_with_prec =
   ignore_prec pred
 
+let ls_pred : Formula.ls_pred t =
+  fun ppf pred -> match pred with
+    | Eql  -> Fmt.string ppf "=l"
+    | Neql -> Fmt.string ppf "/=l"
+
+let ls_pred_ : Formula.pred t_with_prec =
+  ignore_prec pred
+
 let rec gen_formula_
     :  'bvar t_with_prec
     -> 'avar t_with_prec
-    -> ('bvar, 'avar) Formula.gen_t t_with_prec =
+    -> ('bvar, 'avar, 'lvar) Formula.gen_t t_with_prec =
   fun bvar avar prec ppf f -> match f with
     | Var x      -> bvar prec ppf x
     | Bool true  -> Fmt.string ppf "true"
@@ -151,10 +185,16 @@ let rec gen_formula_
           pred pred'
           (gen_arith_ avar prec) f2
     | Pred _ -> assert false
+    | LsPred(pred', [f1;f2]) ->
+        Fmt.pf ppf "@[<1>%a@ %a@ %a@]"
+          (gen_ls_arith_ avar prec) f1
+          ls_pred pred'
+          (gen_ls_arith_ avar prec) f2
+    | _ -> assert false
 let gen_formula
     :  'bvar t_with_prec
     -> 'avar t_with_prec
-    -> ('bvar, 'avar) Formula.gen_t t =
+    -> ('bvar, 'avar, 'lvar) Formula.gen_t t =
   fun bvar avar ppf f ->
     gen_formula_ bvar avar Prec.zero ppf f
 let formula_ : Formula.t t_with_prec =
@@ -167,11 +207,13 @@ let formula : Formula.t Fmt.t =
 let argty_ : (Prec.t -> 'ty Fmt.t) -> Prec.t -> 'ty Type.arg Fmt.t =
   fun format_ty_ prec ppf arg -> match arg with
     | TyInt -> Fmt.string ppf "int"
+    | TyList -> Fmt.string ppf "list"
     | TySigma sigma -> format_ty_ prec ppf sigma
 
 let argty : 'ty Fmt.t -> 'ty Type.arg Fmt.t =
   fun format_ty ppf arg -> match arg with
     | TyInt -> Fmt.string ppf "int"
+    | TyList -> Fmt.string ppf "list"
     | TySigma sigma -> format_ty ppf sigma
 
 let rec ty_ : ?with_var:bool -> 'annot Fmt.t -> Prec.t -> 'annot Type.ty Fmt.t =
@@ -304,9 +346,15 @@ let rec hflz_ : (Prec.t -> 'ty Fmt.t) -> Prec.t -> 'ty Hflz.t Fmt.t =
           (hflz_ format_ty_ Prec.(succ app)) psi2
     | Arith a ->
         arith_ prec ppf a
+    | LsArith a ->
+        ls_arith_ prec ppf a
     | Pred (pred, as') ->
         show_paren (prec > Prec.eq) ppf "%a"
           formula (Formula.Pred(pred, as'))
+    | LsPred (pred, as') ->
+        show_paren (prec > Prec.eq) ppf "%a"
+          formula (Formula.LsPred(pred, as'))
+
 let hflz : (Prec.t -> 'ty Fmt.t) -> 'ty Hflz.t Fmt.t =
   fun format_ty_ -> hflz_ format_ty_ Prec.zero
 

@@ -1,3 +1,4 @@
+(* foldrの中でsum_may_nontermで値を合計するが、sum_may_nontermは無限ループになることがある *)
 let read_int2 () =
   let res = read_int () in
   if res <= (-3) then

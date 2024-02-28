@@ -3,7 +3,7 @@ import sys
 import json
 
 TIMEOUT_T = 180
-FAIL_T = -1
+FAIL_T = 100
 # dataset identity
 def ds_iden(x):
     l = x.split('/')

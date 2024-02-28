@@ -7,9 +7,28 @@ open Hflmc2_util
 
 let oneshot = ref false
 
+let tractable_check_only = ref false
+
+let stop_if_intractable = ref false
+
+let z3_path = ref ""
+
+let pcsat_config = ref ""
+
+let use_annotation = ref false
+
+let solve_dual = ref ""
+
+let stop_if_tractable = ref false
+
+let remove_disjunctions_if_intractable = ref false
+
+let remove_disjunctions = ref false
+
+let remove_temporary_files = ref false
+
 module Preprocess = struct
-  let inlining           = ref (Obj.magic())
-  let remove_disjunction = ref (Obj.magic())
+  let inlining = ref (Obj.magic())
 end
 
 module Abstraction = struct
@@ -60,8 +79,6 @@ type params =
   (* Preprocess *)
   ; no_inlining : bool [@default false]
     (** Disable inlining *)
-  ; remove_disjunction: bool [@default false]
-    (** Remove disjunction *)
 
   (* Logging *)
   ; log_debug : string list [@default []] [@docs "Log"] [@docv "MODULE,..."] [@aka ["debug"]]
@@ -85,16 +102,45 @@ type params =
   
   (* Typing *)
   ; solver : string [@default "auto"] [@docs "Typing"] [@docv "solver_name"]
-  (** Choose background CHC solver. Available: auto z3, hoice, eldarica, fptprover *)
+  (** Choose background CHC solver. Available: auto z3, hoice, fptprover *)
 
   ; show_refinement: bool [@default false] [@docs "Typing"] [@docv "show refinement"]
   (** Show refinement types. This sometimes fails because of parsing the solution from CHC solver... *)
 
+  ; dont_show_refinement : bool [@default false] [@docs "Typing"] [@docv "don't show refinement"]
+  (** Do not show refinement types (override the --show-refinement option)  *)
+  
   ; mode_burn_et_al: bool [@default false] [@docs "Typing"] [@docv "Use the subtyping rule of burn et al"]
   (** Use Subtying rule in burn et al *)
 
   ; no_disprove: bool [@default false]
     (** Disable disproving*)
+    
+  ; tractable_check_only: bool [@default false]
+  
+  ; stop_if_intractable : bool [@default false]
+  
+  ; stop_if_tractable : bool [@default false]
+  
+  ; remove_disjunctions_if_intractable : bool [@default false]
+  
+  ; remove_disjunctions : bool [@default false]
+  
+  ; z3_path : string [@default "z3"]
+  (** path of z3 **)
+  
+  ; pcsat_config : string [@default "solver/pcsat_tb.json"]
+  (** path of config for pcsat. e.g., solver/pcsat_dt.json **)
+  
+  ; use_annotation : bool [@default false]
+  (** use annotations in %ENV section to solve a formula *)
+  
+  ; solve_dual : string [@default "auto"]
+  (** "auto" (default): automatically solve dual or non-dual chc, depends on the sizes of the dual and non-dual chc / "dual": solve dual chc / "non-dual": solve non-dual chc / "auto-conservative" : solve non-dual chc, unless the non-dual chc is extended chc and the dual chc is not *)
+  
+  ; remove_temporary_files : bool [@default false]
+  (** Remove temporary files in /tmp on exit  *)
+  ; 
   }
   [@@deriving cmdliner,show]
 
@@ -103,15 +149,24 @@ let set_up_params params =
   set_module_log_level Info                params.log_info;
   set_ref oneshot                          params.oneshot;
   set_ref Preprocess.inlining              (not params.no_inlining);
-  set_ref Preprocess.remove_disjunction    params.remove_disjunction;
   set_ref Abstraction.max_I                params.abst_max_I;
   set_ref Abstraction.max_ands             params.abst_max_ands;
   set_ref Abstraction.modify_pred_by_guard (not params.abst_no_modify_pred_by_guard);
   set_ref Refine.use_legacy                params.refine_legacy;
   set_ref Typing.solver                    params.solver;
-  set_ref Typing.show_refinement           params.show_refinement;
+  set_ref Typing.show_refinement           (params.show_refinement && not params.dont_show_refinement);
   set_ref Typing.mode_burn_et_al           params.mode_burn_et_al;
   set_ref Typing.no_disprove               params.no_disprove;
+  set_ref tractable_check_only             params.tractable_check_only;
+  set_ref stop_if_intractable              params.stop_if_intractable;
+  set_ref z3_path                          params.z3_path;
+  set_ref pcsat_config                     params.pcsat_config;
+  set_ref use_annotation                   params.use_annotation;
+  set_ref solve_dual                       params.solve_dual;
+  set_ref stop_if_tractable                params.stop_if_tractable;
+  set_ref remove_disjunctions_if_intractable  params.remove_disjunctions_if_intractable;
+  set_ref remove_disjunctions              params.remove_disjunctions;
+  set_ref remove_temporary_files           params.remove_temporary_files;
   params.input
 
 (******************************************************************************)

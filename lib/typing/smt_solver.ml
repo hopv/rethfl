@@ -6,7 +6,7 @@ let name_of_solver = function
   | `Z3 -> "z3"
 
 let selected_cmd = function
-  | `Z3 -> [|"z3" |]
+  | `Z3 -> [|!Hflmc2_options.z3_path|]
 
 let get_epilogue = function
   | `Z3 -> "\n(check-sat)\n"
@@ -22,9 +22,7 @@ let fpl2smt2 solver fml =
 
 let save_fpl_to_smt2 solver fpl =
     let smt2 = fpl2smt2 solver fpl in
-    Random.self_init ();
-    let r = Random.int 0x10000000 in
-    let file = Printf.sprintf "/tmp/%s-%d.smt2" (name_of_solver solver) r in
+    let file = Hflmc2_util.gen_temp_filename ("/tmp/" ^ (name_of_solver solver) ^ "-") ".smt2" in
     let oc = open_out file in
     Printf.fprintf oc "%s" smt2;
     close_out oc;
@@ -35,9 +33,9 @@ let check_sat_fpl ?(timeout=100000.0) solver fpl =
   let file = save_fpl_to_smt2 solver fpl in
   let cmd = selected_cmd solver in
   let _, out, _ = Fn.run_command ~timeout:timeout (Array.concat [cmd; [|file|]]) in
-  match String.lsplit2 out ~on:'\n' with
-  | Some ("unsat", _) -> `Unsat
-  | Some ("sat", _) -> `Sat
-  | Some ("unknown", _) -> `Unknown
+  match lsplit2_fst out ~on:'\n' with
+  | "unsat", _ -> `Unsat
+  | "sat", _ -> `Sat
+  | "unknown", _ -> `Unknown
   | _ -> 
     failwith @@ Printf.sprintf "failed to handle smt solver result: %s" out

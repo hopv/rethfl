@@ -1,6 +1,8 @@
+(* 値が変わらなくなるまで再帰適用 *)
 let rec fix (f:int -> int) (n:int) =
   let n2 = f n in
   if n2 = n then n else fix f n2
+(* 値を0になるまで減らす。負値だと停止しない *)
 let to_zero n =
   if n = 0 then 0
   else n - 1

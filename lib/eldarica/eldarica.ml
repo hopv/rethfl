@@ -7,9 +7,9 @@ let parse lexbuf =
     Parser.graph Lexer.read lexbuf
   with
     | Parser.Error ->
-    failwith @@ Printf.sprintf "Parse error "
-  | Failure _ ->
-      failwith @@ Printf.sprintf "Lexing error "
+      failwith @@ Printf.sprintf "Parse error "
+    | Failure _ ->
+        failwith @@ Printf.sprintf "Lexing error "
 
 let parse_file in_name =
   in_name |> open_in |> Lexing.from_channel |> parse

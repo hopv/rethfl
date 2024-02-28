@@ -81,7 +81,6 @@ def handle(file, parser, callback=p, retry=0):
         handle(file, parser, callback, retry - 1)
     else:
         result['file'] = file
-        result['size'] = os.path.getsize(file)
         callback(file, result)
         results.append(result)
 

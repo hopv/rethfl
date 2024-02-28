@@ -25,22 +25,28 @@ let name_of_solver = function
 
 let auto = `Auto(`Hoice, [])
 
-let selected_solver size = 
+let selected_solver is_tractable = 
   let sv = !Typing.solver in
-  if size > 1 then `Fptprove
-  else if sv = "auto" then auto
-  else if sv = "z3" || sv = "spacer" then `Spacer
-  else if sv = "hoice" then `Hoice
-  else if sv = "eld" || sv = "eldarica" then `Eldarica
-  else if sv = "fptprove" then `Fptprove
-  else failwith ("Unknown solver: " ^ sv)
+  let solver =
+    if sv = "auto" then auto
+    else if sv = "z3" || sv = "spacer" then `Spacer
+    else if sv = "hoice" then `Hoice
+    else if sv = "fptprove" then `Fptprove
+    else if sv = "liu" || sv = "hoice-haskell" || sv = "hoice-ex" then `Liu
+    else if sv = "eldarica" || sv = "eld" then `Eldarica
+    else failwith ("Unknown solver: " ^ sv)
+  in
+  if not is_tractable && solver != `Fptprove && solver != `Liu then
+    `Fptprove
+  else
+    solver
 
 (* set of template *)
 let call_template cmd timeout = 
     let open Hflmc2_util in
     fun file -> 
     let _, out, _ = Fn.run_command ~timeout:timeout (Array.concat [cmd; [|file|]]) in
-    String.lsplit2 out ~on:'\n'
+    lsplit2_fst out ~on:'\n'
 
 let call_fptprove timeout file = 
   let open Hflmc2_util in
@@ -48,18 +54,39 @@ let call_fptprove timeout file =
     try Sys.getenv "fptprove" with
     | Not_found -> Filename.concat (Sys.getenv "HOME") "bitbucket.org/uhiro/fptprove"
   in
-  Sys.chdir fptprove_path;
-  let _, out, _ = Fn.run_command ~timeout:timeout (Array.concat [[|"./script/hflmc3.sh"|]; [|file|]]) in
+  let launch_script_path = Script.prepare_fptprove_script () in
+  let _, out, _ = Fn.run_command ~timeout:timeout [|"bash"; launch_script_path; file; fptprove_path; string_of_int ((int_of_float timeout) + 5); !Hflmc2_options.pcsat_config|] in
   let l = String.split out ~on:',' in
   match List.nth l 1 with
-    | Some(x) -> Some(x, "")
-    | None -> None
+    | Some(x) -> x, Some ""
+    | None -> "Failed", None
 
+let call_liu_solver timeout file =
+  let open Hflmc2_util in
+  let solver_path = 
+    try Sys.getenv "liu_solver" with
+    | Not_found -> failwith "Error: the environment variable \"liu_solver\" is not set" 
+  in
+  (* let _, out, _ = Fn.run_command ~timeout:timeout [|solver_path; "--preproc"; file|] in *)
+  let _, out, _ = Fn.run_command ~timeout:timeout [|solver_path; file|] in
+  let reg_time = Str.regexp "^solve time" in
+  let reg_sat = Str.regexp "^Satisfied" in
+  try (
+    ignore @@ Str.search_forward reg_time out 0;
+    try
+      ignore @@ Str.search_forward reg_sat out 0;
+      "sat", Some ""
+    with
+      | Not_found -> "unsat", None
+  ) with
+    | Not_found -> "Failed", None
+  
 let selected_cmd timeout = function
-  | `Spacer -> call_template [|"z3"; "fp.engine=spacer"|] timeout
-  | `Hoice -> call_template [|"hoice"|] timeout
-  | `Eldarica -> call_template [|"eld"; "-ssol"|] timeout
-  | `Fptprove -> call_fptprove timeout
+  | `Spacer -> call_template [|!Hflmc2_options.z3_path; "fp.engine=spacer"|] timeout
+  | `Hoice -> call_template [|"hoice"; "--z3"; !Hflmc2_options.z3_path|] timeout
+  | `Fptprove -> call_fptprove timeout  
+  | `Eldarica -> call_template [|"eld"|] timeout
+  | `Liu -> call_liu_solver timeout
   | _ -> failwith "you cannot use this"
   
 let selected_cex_cmd = function
@@ -67,7 +94,7 @@ let selected_cex_cmd = function
     [|"eld"; "-cex";  "-hsmt"|]
   | _ -> failwith "you cannot use this"
 
-let prologue = "(set-logic HORN)
+let prologue = "(declare-fun XX ( (List Int)) Bool)
 "
 
 let get_epilogue = 
@@ -81,7 +108,7 @@ let get_epilogue =
     "\
     (check-sat)
     "
-  | `Hoice ->
+  | `Hoice | `Liu ->
     "\
     (check-sat)
     (get-model)
@@ -93,7 +120,7 @@ let get_epilogue =
 
 let rec collect_preds chcs m = 
   let rec inner rt m = match rt with 
-  | RTemplate (p, l) -> Rid.M.add p (List.length l) m
+  | RTemplate (p, l, ls) -> Rid.M.add p (List.length l, List.length ls) m
   | RAnd(x, y) | ROr(x, y) ->
     m |> inner x |> inner y
   | _ -> m
@@ -113,32 +140,62 @@ let collect_vars chc =
     | x::xs -> 
       m |> collect_from_arith x |> collect_from_ariths xs
   in
-  let rec inner rt m = match rt with
-  | RTemplate(_, l) | RPred(_, l) -> 
-    collect_from_ariths l m
-  | RAnd(x, y) | ROr(x, y) -> 
-    m |> inner x |> inner y
-  | _ -> m
-  in 
-  IdSet.empty |> inner chc.head |> inner chc.body
+  let collect_from_ls_arith a m1 m2 =
+    let (afvs, lfvs) = Arith.lfvs a in
+    (List.fold_left IdSet.add m1 afvs, List.fold_left IdSet.add m2 lfvs)
+  in
+  let rec collect_from_ls_ariths ars m1 m2 = match ars with
+    | [] -> (m1, m2)
+    | x::xs ->
+      let (set1, set2) = collect_from_ls_arith x m1 m2 in
+      collect_from_ls_ariths xs set1 set2
+  in
+  let rec inner rt m1 m2 = match rt with
+  | RTemplate(_, l, ls) -> 
+    let avar1 = collect_from_ariths l m1 in
+    let (avar2, lvar) = collect_from_ls_ariths ls m1 m2 in
+    (IdSet.union avar1 avar2, lvar)
+  | RPred(_, l) ->
+    collect_from_ariths l m1, m2
+  | RLsPred(_, ls) ->
+    collect_from_ls_ariths ls m1 m2
+  | RAnd(x, y) | ROr(x, y) ->
+    let (m1, m2) = inner x m1 m2 in
+    inner y m1 m2
+  | _ -> (m1, m2)
+  in
+  let (m1, m2) = inner chc.head IdSet.empty IdSet.empty in
+  inner chc.body m1 m2
 
 
 let gen_assert solver chc =
-  let vars = collect_vars chc in
-  let vars_s = vars |> IdSet.to_list |> List.map var_def |> List.fold_left (^) "" in
+  let (avars, lvars) = collect_vars chc in
+  let vars_s = avars |> IdSet.to_list |> List.map var_def |> List.fold_left (^) "" in
+  let lvars_s = lvars |> IdSet.to_list |> List.map lvar_def |> List.fold_left (^) "" in
+  let vars_s = vars_s ^ lvars_s in
   let body = ref2smt2 chc.body in
   let head = ref2smt2 chc.head in
   let s = Printf.sprintf "(=> %s %s)" body head in
-  if vars_s = "" && (solver = `Spacer || solver = `Fptprove || solver = `Eldarica) then
+  if vars_s = "" && (solver == `Spacer || solver == `Fptprove || solver == `Eldarica || solver == `Liu) then
     Printf.sprintf "(assert %s)\n" s
   else
-    Printf.sprintf "(assert (forall (%s) %s))\n" vars_s s
-
-let chc2smt2 chcs solver = 
-  let preds = collect_preds chcs Rid.M.empty in
+    Printf.sprintf "(assert (forall (%s) %s))\n" vars_s s  
+  
+let chc2smt2 env chcs solver = 
+  let empty: (int * int) Rid.M.t = Rid.M.empty in
+  let preds = collect_preds chcs empty in
+  let preds =
+    Rid.M.filter
+      (fun id _ ->
+        match Rid.M.find_opt id env with
+        | Some _ -> false
+        | None -> true
+      )
+      preds in
   let def = preds |> Rid.M.bindings |> List.map pred_def |> List.fold_left (^) "" in
+  let concrete_def = env |> Rid.M.bindings |> List.map pred_concrete_def |> List.fold_left (^) "" in
   let body = chcs |> List.map (gen_assert solver) |> List.fold_left (^) "" in
-  prologue ^ def ^ body ^ (get_epilogue solver)
+  prologue ^ def ^ concrete_def ^ body ^ (get_epilogue solver)
 
 
 let parse_model model = 
@@ -187,10 +244,6 @@ let parse_model model =
             end
     | s -> fail "parse_arith" s
   in
-  let parse_predicate_name s = 
-    let tail = String.sub s 1 (String.length s - 1) in
-    int_of_string tail
-  in
   let rec parse_formula = function
     | Atom "true"  -> RTrue
     | Atom "false" -> RFalse
@@ -205,7 +258,7 @@ let parse_model model =
           | "and" -> `And 
           | "or"  -> `Or 
           | "not" -> `Not 
-          | var -> `Var var
+          | "exists" -> `Exists
           | s     -> fail "parse_formula:list" (Atom s)
         in
         begin match a with
@@ -220,8 +273,14 @@ let parse_model model =
         | `Not -> 
             let [@warning "-8"] [f] = List.map ss ~f:parse_formula in
             negate_ref f
-        | `Var var -> 
-          RTemplate ((Rid.from_string var , List.map ~f:parse_arith ss))
+        | `Exists ->
+          let [@warning "-8"] (List args)::[f] = ss in
+          let as'' = List.map ~f:parse_arg args in
+          let f = parse_formula f in
+          let rec go a = match a with
+            | [] -> f
+            | x::xs -> RExists (x, go xs) in
+          go as''
         end
     | s -> fail "parse_formula" s
   in
@@ -233,67 +292,46 @@ let parse_model model =
         (id, args, body)
     | s -> fail "parse_def" s
   in
-  let simplify defs = 
-    let rec subst_arg vars args form = match (vars, args) with
-      | ([], []) -> form
-      | (v::vars, x::xs) -> subst_arg vars xs (subst_refinement v (RArith x) form)
-      | _ -> failwith "program error"
-    in
-    let rec simplify_def x = match x with
-      | RAnd(x, y) -> RAnd(simplify_def x, simplify_def y)
-      | ROr(x, y) -> ROr(simplify_def x, simplify_def y)
-      | RTemplate((name, args)) -> 
-        let (_, vars, form) = List.find_exn defs ~f:(fun (name', _, _) -> (Rid.eq name name')) in
-        subst_arg vars args form
-      | RPred _ | RFalse | RTrue -> x
-    in
-    let rec inner xs = match xs with
-      | [] -> []
-      | (name, args, x)::xs -> (name, args, simplify_def x) :: inner xs
-    in inner defs
-  in
-  print_string model;
+  print_endline "Before model simplification:";
+  print_endline model;
+  let model = Simplify_model.simplify_model model in
+  print_endline "After model simplification:";
+  print_endline model;
   match Sexplib.Sexp.parse model with
   | Done(model, _) -> begin 
     match model with
     | List (Atom "model" :: sol) ->
-        let defs = List.map ~f:parse_def sol in
-        Ok(simplify defs)
+        Ok(List.map ~f:parse_def sol)
     | _ -> Error "parse_model" 
     end
   | _ -> Error "failed to parse model"
 
-let selected_parse_model model = function
-  `Spacer | `Hoice -> parse_model model
-  | `Eldarica -> parse_model ("(model " ^ model ^ ")")
-  | _ -> Error "The model emitted by this solver cannot be parsed"
-
-
-let save_chc_to_smt2 chcs solver = 
-    let smt2 = chc2smt2 chcs solver in
-    Random.self_init ();
-    let r = Random.int 0x10000000 in
-    let file = Printf.sprintf "/tmp/%s-%d.smt2" (name_of_solver solver) r in
+let save_chc_to_smt2 env chcs solver = 
+    let smt2 = chc2smt2 env chcs solver in
+    let file = Hflmc2_util.gen_temp_filename ("/tmp/" ^ name_of_solver solver ^ "-") ".smt2" in
     let oc = open_out file in
     Printf.fprintf oc "%s" smt2;
     close_out oc;
     file
 
-let check_sat ?(timeout=100000.0) chcs solver = 
+let check_sat ?(timeout=100000.0) env chcs solver = 
   let check_sat_inner timeout solver = 
-    let file = save_chc_to_smt2 chcs solver in
+    let file = save_chc_to_smt2 env chcs solver in
     let open Hflmc2_util in
     let f = selected_cmd timeout solver in
     match f file with
-    | Some ("unsat", _) -> `Unsat
-    | Some ("sat", model) ->
-      let open Hflmc2_options in
-      if !Typing.show_refinement then
-        `Sat(selected_parse_model model solver)
-      else
-        `Sat(Error "did not calculate refinement. Use --show-refinement")
-    | Some ("unknown", _) -> `Unknown
-    | Some(x, _) -> (Printf.printf "Failed to handle the result of chc solver: %s\n\n" x; `Fail)
+    | "unsat", _ -> `Unsat
+    | "sat", Some model ->
+      if Stdlib.String.trim model = "" then
+        `Sat(Error "model was not produced")
+      else begin
+        let open Hflmc2_options in
+        if !Typing.show_refinement then
+          `Sat(parse_model model)
+        else
+          `Sat(Error "did not calculate refinement. Use --show-refinement")
+      end
+    | "unknown", Some _ -> `Unknown
     | _ -> (Printf.printf "Failed to handle the result of chc solver\n\n" ; `Fail)
   in 
   match solver with
@@ -308,7 +346,7 @@ let check_sat ?(timeout=100000.0) chcs solver =
           | _ -> loop xs
         end
     in loop tries
-  | `Spacer | `Hoice | `Eldarica | `Fptprove as sv -> check_sat_inner timeout sv
+  | `Eldarica | `Spacer | `Hoice | `Fptprove | `Liu as sv -> check_sat_inner timeout sv
 
 (* usp: unsat proof *)
 let rec unsat_proof_of_eldarica_cex nodes = 
@@ -322,9 +360,9 @@ let rec unsat_proof_of_eldarica_cex nodes =
                 Rid.from_string Dag.(x.head);
               args=Dag.(x.args);
               nodes=[];}::(unsat_proof_of_eldarica_cex xs) (* TODO *)
-let get_unsat_proof ?(timeout=100.0) chcs solver = 
+let get_unsat_proof ?(timeout=100.0) env chcs solver = 
   let open Hflmc2_util in
-  let file = save_chc_to_smt2 chcs solver in
+  let file = save_chc_to_smt2 env chcs solver in
   let cmd = selected_cex_cmd solver in
   let _, out, _ = Fn.run_command ~timeout:timeout (Array.concat [cmd; [|file|]]) in
   let p = Eldarica.parse_string out in

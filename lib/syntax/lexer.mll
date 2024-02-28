@@ -10,7 +10,7 @@ let digit = ['0'-'9']
 let lower = ['a'-'z' '_']
 let upper = ['A'-'Z']
 let alphanum = ['0'-'9' 'a'-'z' 'A'-'Z' '_']
-let ope_symbols = [ '=' '<' '>' '+' '-' '*' '&' '|' '\\' '/' '!' '%']
+let ope_symbols = [ '=' '<' '>' '+' '-' '*' '&' '|' '\\' '/' '!' ]
 
 rule token = parse
 | "\n"                     { Lexing.new_line lexbuf; token lexbuf }
@@ -28,6 +28,10 @@ rule token = parse
 | ")"                      { RPAREN    }
 | "["                      { LSQUARE   }
 | "]"                      { RSQUARE   }
+| "[]"                     { NIL       }
+| "::"                     { CONS      }
+| "=l"                     { EQL       }
+| "<>l"                    { NEQL      }
 | "true"                   { TRUE      }
 | "false"                  { FALSE     }
 | ("\\"|"λ")               { LAMBDA    }

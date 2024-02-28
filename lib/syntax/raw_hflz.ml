@@ -7,8 +7,11 @@ type raw_hflz =
   | Abs  of string * raw_hflz
   | App  of raw_hflz * raw_hflz
   | Int  of int
+  | Nil
+  | Cons of raw_hflz * raw_hflz
   | Op   of Arith.op * raw_hflz list
   | Pred of Formula.pred * raw_hflz list
+  | LsPred of Formula.ls_pred * raw_hflz list
   | Forall of string * raw_hflz
   [@@deriving eq,ord,show,iter,map,fold,sexp]
 type hes_rule =
@@ -22,6 +25,8 @@ type hes = hes_rule list
   [@@deriving eq,ord,show,iter,map,fold,sexp]
 
 let mk_int n     = Int(n)
+let mk_nil = Nil
+let mk_cons hd tl = Cons (hd, tl)
 let mk_bool b    = Bool b
 let mk_var x     = Var x
 let mk_op op as' = Op(op,as')
@@ -36,7 +41,7 @@ let mk_ors = function
   | x::xs -> List.fold_left xs ~init:x ~f:(fun a b -> Or(a,b))
 
 let mk_pred pred a1 a2 = Pred(pred, [a1;a2])
-
+let mk_lspred pred a1 a2 = LsPred(pred, [a1;a2])
 let mk_app t1 t2 = App(t1,t2)
 let mk_apps t ts = List.fold_left ts ~init:t ~f:mk_app
 
@@ -65,6 +70,7 @@ module Typing = struct
   type tyvar = (* simple_ty + simple_argty + type variable *)
     | TvRef of int * tyvar option ref
     | TvInt
+    | TvList
     | TvBool
     | TvArrow of tyvar * tyvar
     [@@deriving show { with_path = false }]
@@ -78,6 +84,7 @@ module Typing = struct
     fun ppf tv -> match tv with
       | TvInt -> Fmt.string ppf "int"
       | TvBool -> Fmt.string ppf "o"
+      | TvList -> Fmt.string ppf "list"
       | TvRef(id,{contents=None }) ->
           Fmt.pf ppf "tv%d" id
       | TvRef(id,{contents=Some tv}) ->
@@ -90,7 +97,7 @@ module Typing = struct
   exception Alias
   let rec occur : top:bool -> tyvar option ref -> tyvar -> bool =
     fun ~top r tv -> match tv with
-      | TvInt | TvBool -> false
+      | TvInt | TvBool | TvList -> false
       | TvArrow(tv1, tv2) -> occur ~top:false r tv1 || occur ~top:false r tv2
       | TvRef(_, ({contents=None} as r')) ->
           if r == r' && top then raise Alias else r == r'
@@ -111,7 +118,7 @@ module Typing = struct
 
   let rec write : tyvar option ref -> tyvar -> unit =
     fun r tv -> match tv with
-      | TvInt | TvBool | TvArrow _ -> r := Some tv
+      | TvInt | TvBool | TvList | TvArrow _ -> r := Some tv
       | TvRef (_, r') ->
           begin match !r' with
           | None -> r := Some tv
@@ -128,6 +135,7 @@ module Typing = struct
       match tv1, tv2 with
       | TvInt, TvInt -> ()
       | TvBool, TvBool -> ()
+      | TvList, TvList -> ()
       | TvArrow(tv11,tv12),  TvArrow(tv21,tv22) ->
           unify tv11 tv21; unify tv12 tv22
       | TvRef (_,r1), TvRef (_,r2) when r1 == r2 ->
@@ -179,9 +187,11 @@ module Typing = struct
   class add_annot = object (self)
     (* for compatibility with Suzuki's implementation *)
     val mutable unbound_ints : id_env = StrMap.empty
+    val mutable unbound_lists : id_env = StrMap.empty
     val mutable ty_env : ty_env = IntMap.empty
 
     method get_unbound_ints : id_env = unbound_ints
+    method get_unbound_lists : id_env = unbound_lists
     method get_ty_env : ty_env = ty_env
 
     method add_ty_env : 'a. 'a Id.t -> tyvar -> unit =
@@ -212,6 +222,26 @@ module Typing = struct
             self#add_ty_env x TvInt; Arith.mk_var x
         | Op (op, as') -> Op (op, List.map ~f:(self#arith id_env) as')
         | _ -> failwith "annot.arith"
+
+    method ls_arith : id_env -> raw_hflz -> Arith.lt =
+      fun id_env ls -> match ls with
+        | Nil -> Arith.mk_nil
+        | Cons (hd, tl) -> Arith.mk_cons (self#arith id_env hd) (self#ls_arith id_env tl)
+        | Var name ->
+            let x =
+              match
+                StrMap.find id_env name,
+                StrMap.find unbound_lists name
+              with
+              | None, None ->
+                  let id = Id.gen_id() in
+                  unbound_lists <- StrMap.add_exn unbound_lists ~key:name ~data:id;
+                  Id.{ name; id; ty=`List }
+              | Some id, _ | _, Some id  -> (* the order of match matters! *)
+                  Id.{ name; id; ty=`List }
+            in
+            self#add_ty_env x TvList; Arith.mk_lvar x
+        | _ -> failwith "annot.ls_arith"
 
     method term : id_env -> raw_hflz -> tyvar -> unit Hflz.t =
       fun id_env psi tv ->
@@ -255,9 +285,15 @@ module Typing = struct
         | Pred (pred,as') ->
             unify tv TvBool;
             Pred(pred, List.map ~f:(self#arith id_env) as')
+        | LsPred (pred,as') ->
+            unify tv TvBool;
+            LsPred(pred, List.map ~f:(self#ls_arith id_env) as')
         | Int _ | Op _ ->
             unify tv TvInt;
             Arith (self#arith id_env psi)
+        | Nil | Cons _ ->
+            unify tv TvList;
+            LsArith (self#ls_arith id_env psi)
         | Abs(name, psi) ->
             let id = new_id() in
             let x = Id.{ name; id; ty = () } in
@@ -282,7 +318,6 @@ module Typing = struct
             let psi1 = self#term id_env psi1 (TvArrow(tv_arg, tv)) in
             let psi2 = self#term id_env psi2 tv_arg in
             App (psi1, psi2)
-            
 
     method hes_rule : id_env -> hes_rule -> unit Hflz.hes_rule =
       fun id_env rule ->
@@ -337,12 +372,14 @@ module Typing = struct
   end
 
   exception IntType
+  exception ListType
 
   class deref ty_env = object (self)
     val ty_env : ty_env = ty_env
 
     method arg_ty : string -> tyvar -> simple_ty arg = fun info -> function
       | TvInt  -> TyInt
+      | TvList -> TyList
       | TvBool -> TySigma (TyBool())
       | TvRef (_, {contents=None}) as tv ->
           Log.debug begin fun _ ->
@@ -356,6 +393,7 @@ module Typing = struct
     method ty : string -> tyvar -> simple_ty =
       fun info tv -> match self#arg_ty info tv with
       | TyInt -> raise IntType
+      | TyList -> raise ListType
       | TySigma ty -> ty
 
     method id : unit Id.t -> simple_ty Id.t =
@@ -372,6 +410,7 @@ module Typing = struct
           begin match self#id x with
           | x -> Var x
           | exception IntType -> Arith (Arith.mk_var x)
+          | exception ListType -> LsArith (Arith.mk_lvar x)
           end
       | Bool b           -> Bool b
       | Or  (psi1,psi2)  -> Or  (self#term psi1, self#term psi2)
@@ -380,7 +419,9 @@ module Typing = struct
       | Abs (x, psi)     -> Abs (self#arg_id x, self#term psi)
       | Forall(x, psi)   -> Forall (self#arg_id x, self#term psi)
       | Arith a          -> Arith a
+      | LsArith a        -> LsArith a
       | Pred (pred,as')  -> Pred(pred, as')
+      | LsPred (pred,as')-> LsPred(pred, as')
 
     method hes_rule : unit Hflz.hes_rule -> simple_ty Hflz.hes_rule =
       fun rule ->
@@ -463,13 +504,15 @@ let rename_ty_body : simple_ty Hflz.hes -> simple_ty Hflz.hes =
         | And (psi1, psi2) -> And (term env psi1, term env psi2)
         | App (psi1, psi2) -> App (term env psi1, term env psi2)
         | Arith a          -> Arith a
+        | LsArith a          -> LsArith a
         | Pred (pred, as') -> Pred (pred, as')
+        | LsPred (pred, as') -> LsPred (pred, as')
         | Abs ({ty=TySigma ty;_} as x, psi) ->
             Abs(x, term (IdMap.add env x ty) psi)
-        | Abs ({ty=TyInt;_} as x, psi) -> Abs(x, term env psi)
+        | Abs (x, psi) -> Abs(x, term env psi)
         | Forall ({ty=TySigma ty;_} as x, psi) ->
             Forall (x, term (IdMap.add env x ty) psi)
-        | Forall ({ty=TyInt;_} as x, psi) -> Forall (x, term env psi)
+        | Forall (x, psi) -> Forall (x, term env psi)
     in
     let rule : simple_ty IdMap.t
             -> simple_ty Hflz.hes_rule

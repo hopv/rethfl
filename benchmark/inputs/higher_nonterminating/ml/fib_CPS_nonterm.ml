@@ -1,3 +1,6 @@
+(* HESとの対応がわかりやすくなるために分割して書いているが、素直なCPS変換をしたものと等価 *)
+(* mainで、-3を引数に渡すので、停止しない場合がある *)
+
 let rec fib_CPS_nonterm n k =
   if n = 0 || n = 1 then k 1
   else

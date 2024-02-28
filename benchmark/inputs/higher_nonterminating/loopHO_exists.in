@@ -1,0 +1,62 @@
+%HES
+Main =v ∃n. Loop n.
+
+Loop n =v (n <= 0 \/ (∃d. Loop (n + d))) /\ (n > 0 \/ false).
+
+/* in Loop, n should always be positive */
+
+/*
+  simplest
+  3 sec
+
+  Main : bool =ν ∀n24:int.n24 < 10 || P8 n24
+  P8 : int -> bool =ν λn25:int.n25 >= 0 && (Loop n25 || Loop (-n25) || P8 (n25 - 1))
+  Loop : int -> bool =ν
+    λn36:int.
+     (n36 <= 0 || (∀d47:int.d47 < 1 * n36 + 10 || d47 < -1 * n36 + 10 || P10 d47 n36)) && n36 > 0
+  P10 : int -> int -> bool =ν
+    λd48:int.λn39:int.d48 >= 0 && (Loop (n39 + d48) || Loop (n39 + -d48) || P10 (d48 - 1) n39)
+*/
+
+/* 
+  Read_int
+  6 sec
+  
+  Main : bool =ν ∀n56:int.n56 < 10 || P23 n56
+  P23 : int -> bool =ν λn57:int.n57 >= 0 && (Loop n57 || Loop (-n57) || P23 (n57 - 1))
+  Loop : int -> bool =ν
+    λn69:int.
+     (n69 <= 0 || (∀n510:int.n510 < 1 * n69 + 10 || n510 < -1 * n69 + 10 || P25 n510 n69))
+     && n69 > 0
+  P25 : int -> int -> bool =ν
+    λn511:int.
+     λn612:int.
+      n511 >= 0 && (Loop_sub21 n612 n511 || Loop_sub21 n612 (-n511) || P25 (n511 - 1) n612)
+  Loop_sub21 : int -> int -> bool =ν λn613:int.λd714:int.Loop (n613 + d714)
+*/
+
+/*
+  Read_int, App
+  timeout
+  
+  Main : bool =ν ∀n67:int.n67 < 10 || P58 n67
+  P58 : int -> bool =ν
+    λn68:int.
+     n68 >= 0
+     && (Loop (λn1010:int.λk1111:(int -> bool).k1111 n1010) n68
+         || Loop (λn1010:int.λk1111:(int -> bool).k1111 n1010) (-n68) || P58 (n68 - 1))
+  Loop : (int -> (int -> bool) -> bool) -> int -> bool =ν
+    λh712:(int -> (int -> bool) -> bool).
+     λn813:int.
+      (n813 <= 0
+       || (∀n614:int.n614 < 1 * n813 + 10 || n614 < -1 * n813 + 10 || P60 n614 h712 n813))
+      && n813 > 0
+  P60 : int -> (int -> (int -> bool) -> bool) -> int -> bool =ν
+    λn615:int.
+     λh716:(int -> (int -> bool) -> bool).
+      λn817:int.
+       n615 >= 0
+       && (Loop_sub56 h716 n817 n615 || Loop_sub56 h716 n817 (-n615) || P60 (n615 - 1) h716 n817)
+  Loop_sub56 : (int -> (int -> bool) -> bool) -> int -> int -> bool =ν
+    λh718:(int -> (int -> bool) -> bool).λn819:int.λd920:int.h718 (n819 + d920) (Loop h718)
+*/

@@ -18,6 +18,8 @@ let show_result = function
   | `Unknown    -> "Unknown"
   | `Fail       -> "Fail"
 
+let show_tractability = Typing.Infer.show_tractability
+
 let measure_time f =
   let start  = Unix.gettimeofday () in
   let result = f () in
@@ -46,8 +48,47 @@ let report_times () =
         in Print.pr "%s %f sec@." s v
       end
 
+let remove_disjunctions psi top =
+  let (top, psi) = Typing.Remove_disjunctions.convert (Var top, psi) in
+  let psi = {
+    Hflz.var=
+      (let id = Id.gen_id () in
+      {Id.id = id; name = "X" ^ string_of_int id; ty=(Type.TyBool ())});
+    body=top;
+    fix=Fixpoint.Greatest
+  }::psi in
+  let psi = Syntax.Trans.Simplify.hflz_hes psi in
+  Syntax.Trans.Preprocess.main psi
+  |> (fun (psi, top) ->
+    match top with
+    | Some top -> (psi, top)
+    | None -> assert false
+  )
+(* alrm hup int term usr1 usr2 *)
+let set_signals () =
+  let f =
+    Sys.Signal_handle
+      (fun code ->
+        print_endline @@ "signal code: " ^ string_of_int code;
+        Hflmc2_util.remove_generated_files ();
+        Sys.set_signal code Sys.Signal_default;
+        Unix.kill (Unix.getpid ()) code
+        ) in
+  Sys.set_signal Sys.sigalrm f;
+  Sys.set_signal Sys.sighup f;
+  Sys.set_signal Sys.sigint f;
+  Sys.set_signal Sys.sigterm f;
+  Sys.set_signal Sys.sigusr1 f;
+  Sys.set_signal Sys.sigusr2 f
+
 let main file =
-  let psi, _ = Syntax.parse_file file in
+  if !Hflmc2_options.remove_temporary_files then set_signals ();
+  Log.app begin fun m -> m ~header:"z3 path" "%s" !Hflmc2_options.z3_path end;
+  let psi, anno_env = Syntax.parse_file file in
+  let anno_env =
+    if !Options.use_annotation then
+      anno_env
+    else IdMap.empty in
   Log.app begin fun m -> m ~header:"Input" "%a"
     Print.(hflz_hes simple_ty_) psi
   end;
@@ -56,26 +97,34 @@ let main file =
     Print.(hflz_hes simple_ty_) psi
   end;
   let psi, top = Syntax.Trans.Preprocess.main psi in
-  match top with
-  | Some(top) -> begin
-
-    let psi = 
-    if !Options.Preprocess.remove_disjunction then
-      begin
-      (* remove disjunction *)
-        let psi = Syntax.Trans.RemoveDisjunction.f psi top in
-        Log.app begin fun m -> m ~header:"RemoveDisj" "%a"
-          Print.(hflz_hes simple_ty_) psi
-        end;
-        psi
-      end
-    else psi in
-    match Typing.main psi top with
-    | `Sat ->  `Valid
-    | `Unsat ->  `Invalid
-    | `Unknown -> `Unknown
-    | _ -> `Fail
+  let result =
+    match top with
+    | Some(top) -> begin
+      let psi, top =
+        if !Hflmc2_options.remove_disjunctions
+          then (remove_disjunctions psi top)
+          else (psi, top) in
+      try (
+        match Typing.main anno_env psi top with
+        | `Sat ->  `Valid
+        | `Unsat ->  `Invalid
+        | `Unknown -> `Unknown
+        | _ -> `Fail
+      ) with Typing.Infer.ExnIntractable -> (
+        if !Hflmc2_options.remove_disjunctions_if_intractable then (
+          Hflmc2_options.stop_if_tractable := false;
+          let psi, top = remove_disjunctions psi top in
+          match Typing.main anno_env psi top with
+          | `Sat ->  `Valid
+          | `Unsat ->  `Invalid
+          | `Unknown -> `Unknown
+          | _ -> `Fail
+        ) else raise Typing.Infer.ExnIntractable
+      )
     end
-  | None -> print_string "[Warn]input was empty\n";
-      `Valid (* because the input is empty *)
-
+    | None -> print_string "[Warn]input was empty\n";
+        `Valid (* because the input is empty *)
+  in
+  if !Hflmc2_options.remove_temporary_files then Hflmc2_util.remove_generated_files ();
+  result
+  

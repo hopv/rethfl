@@ -4,6 +4,7 @@ open Hflmc2_util
 
 type 'ty arg
   = TyInt
+  | TyList
   | TySigma of 'ty
   [@@deriving eq,ord,show,iter,map,fold,sexp]
 
@@ -16,8 +17,8 @@ type 'annot arg_ty = 'annot ty arg
   [@@deriving eq,ord,show,iter,map,fold,sexp]
 
 let unsafe_unlift : 'annot arg_ty -> 'annot ty = function
-  | TyInt -> invalid_arg "unsafe_unlift"
   | TySigma ty -> ty
+  | _ -> invalid_arg "unsafe_unlift"
 
 let lift_arg x = Id.{ x with ty = TySigma x.ty }
 
@@ -83,10 +84,10 @@ let rec abstract : abstraction_ty -> abstracted_ty = function
       (* bool -> ... -> bool -> o *)
       Fn.apply_n_times ~n:(List.length preds)
         (fun ret -> ATyArrow(ATyBool, ret)) ATyBool
-  | TyArrow({ Id.ty = TyInt; _ }, ret) ->
-      abstract ret
   | TyArrow({ Id.ty = TySigma arg; _}, ret) ->
       ATyArrow(abstract arg, abstract ret)
+  | TyArrow(_, ret) ->
+      abstract ret
 
 let rec arity_of_abstracted_ty : abstracted_ty -> int = function
   | ATyBool -> 0

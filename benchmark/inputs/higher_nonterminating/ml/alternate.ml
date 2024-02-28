@@ -1,4 +1,10 @@
+(* 入力が1,0,1,0,...では停止しない *)
+(* 再帰呼び出しのたびにgとhを逆にする *)
+(* 引数zは、thunkを作るため *)
 let rec f g h z = let x = read_int () in if x>0 then g (f h g) else h (f h g)
 let proceed u = u ()
 let halt u = ()
 let main () = f proceed halt ()
+
+(* run *)
+let () = main ()

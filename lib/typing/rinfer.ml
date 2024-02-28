@@ -3,6 +3,13 @@ open Rtype
 open Hflmc2_syntax
 open Chc
 
+type tractability = T_Tractable | T_Intractable
+let tractability = ref T_Tractable
+let show_tractability () =
+  match !tractability with
+  | T_Tractable -> "tractable"
+  | T_Intractable -> "intractable"
+
 (* timer*)
 let measure_time f =
   let start  = Unix.gettimeofday () in
@@ -34,6 +41,7 @@ let report_times () =
 (* The above code should be merged in hflmc2.ml... *)
 
 let new_var () = RId(Id.gen `Int)
+let new_lvar () = RLId(Id.gen `List)
 let rec rty = function
   | RArrow(_, s) -> rty s
   | RBool(phi) -> phi
@@ -41,10 +49,10 @@ let rec rty = function
 
 let add_constraint x m = 
   match x.head with
-  | RTemplate(p, l) ->
+  | RTemplate(p, l, q) ->
   begin
     let rec find_template = function 
-      | RTemplate(p', l') when p = p' && l = l' -> true
+      | RTemplate(p', l', q') when p = p' && l = l' && q = q' -> true
       | RAnd(x, y) -> find_template x || find_template y
       | _ -> false
     in
@@ -60,8 +68,14 @@ let rec _subtype t t' renv m =
  | RArrow(RInt(RId(x)), t), RArrow(RInt(RId(y)), t')  ->
    (* substitute generate new variable and substitute t and t' by the new var *)
    let v = new_var () in
-   let t2 = subst x v t in
-   let t2' = subst y v t' in
+   let t2 = subst x (RIntP(v)) t in
+   let t2' = subst y (RIntP(v)) t' in
+   _subtype t2 t2' renv m
+ | RArrow(RList(RLId(x)), t), RArrow(RList(RLId(y)), t')  ->
+   (* substitute generate new variable and substitute t and t' by the new var *)
+   let v = new_lvar () in
+   let t2 = subst x (RListP(v)) t in
+   let t2' = subst y (RListP(v)) t' in
    _subtype t2 t2' renv m
  | RArrow(t, s), RArrow(t', s') ->
    let m' = 
@@ -81,7 +95,7 @@ let rec _subtype t t' renv m =
 let subtype t t' m = _subtype t t' RTrue m
 
 (* track: tracking And/Forall to track counterexample *)
-let rec infer_formula track formula env m ints = 
+let rec infer_formula track formula env m ints lists = 
   match formula with
   | Bool b when b -> (RBool(RTrue), m)
   | Bool _ -> (RBool(RFalse), m)
@@ -94,44 +108,50 @@ let rec infer_formula track formula env m ints =
     failwith "no var(infer_formula)"
     end
   | Abs (arg, body) -> 
-    let env' = IdMap.set env arg arg.ty in
-    let ints' = 
+    let env' = IdMap.add env arg arg.ty in
+    let (ints', lists') = 
       begin
       match arg.ty with
       | RInt (RId(i)) -> 
-        Arith.Var(i)::ints
-      | _ -> ints 
+        (Arith.Var(i)::ints, lists)
+      | RList (RLId(i)) -> 
+        (ints, Arith.LVar(i)::lists)
+      | _ -> (ints, lists) 
       end
     in
-    let (body_t, l) = infer_formula track body env' m ints' in
+    let (body_t, l) = infer_formula track body env' m ints' lists' in
     (RArrow(arg.ty, body_t), l)
   | Forall(arg, body, template) ->
-    let env' = IdMap.set env arg arg.ty in
-    let ints' = 
+    let env' = IdMap.add env arg arg.ty in
+    let (ints', lists') = 
       begin
       match arg.ty with
       | RInt (RId(i)) -> 
-        Arith.Var(i)::ints
-      | _ -> ints 
+        (Arith.Var(i)::ints, lists)
+      | RList (RLId(i)) -> 
+        (ints, Arith.LVar(i)::lists)
+      | _ -> (ints, lists) 
       end
     in
-    let (body_t, l) = infer_formula track body env' m ints' in
+    let (body_t, l) = infer_formula track body env' m ints' lists' in
     let template = (RBool(RTemplate template)) in
     let l'' = subtype body_t template l in
     (template, l'')
   | Pred (f, args) -> (RBool(RPred(f, args)), m)
   | Arith x -> (RInt (RArith x), m)
   | Or (x, y, _, _) ->
-    let (x', mx) = infer_formula track x env m ints in
-    let (y', m') = infer_formula track y env mx ints in
+    let (x', mx) = infer_formula track x env m ints lists in
+    let (y', m') = infer_formula track y env mx ints lists in
     let (rx, ry) = match (x', y') with
       | (RBool(rx), RBool(ry)) -> (rx, ry)
       | _ -> failwith "type is not correct"
     in 
     RBool(ROr(rx, ry)), m'
+  | LsArith x -> (RList (RLsArith x), m)
+  | LsPred (f, args) -> (RBool(RLsPred(f, args)), m)
   | And (x, y, t1, t2) -> 
-    let (x', mx) = infer_formula track x env m ints in
-    let (y', m') = infer_formula track y env mx ints in
+    let (x', mx) = infer_formula track x env m ints lists in
+    let (y', m') = infer_formula track y env mx ints lists in
     let (rx, ry) = match (x', y') with
       | (RBool(rx), RBool(ry)) -> (rx, ry)
       | _ -> failwith "type is not correct"
@@ -145,17 +165,19 @@ let rec infer_formula track formula env m ints =
     else
       RBool(RAnd(rx, ry)), m'
   | App(x, y, _) -> 
-    let (x', mx) = infer_formula track x env m ints in
-    let (y', m') = infer_formula track y env mx ints in
+    let (x', mx) = infer_formula track x env m ints lists in
+    let (y', m') = infer_formula track y env mx ints lists in
     let (arg, body, tau) = match (x', y') with
       | (RArrow(arg, body), tau) -> (arg, body, tau)
       | _ -> failwith "type is not correct"
     in begin
       match (arg, tau) with
        | RInt(RId(id)), RInt m -> 
-         (subst id m body, m')
+         (subst id (RIntP(m)) body, m')
+       | RList(RLId(id)), RList m -> 
+         (subst id (RListP(m)) body, m')
        | _ ->
-        let body' = clone_type_with_new_pred ints body in 
+        let body' = clone_type_with_new_pred ints lists body in 
         (*
         print_string "subtyping...";
         print_rtype @@ RArrow(arg, body); print_string " =? "; print_rtype @@ RArrow(tau, body'); print_newline();
@@ -171,7 +193,7 @@ let infer_rule track (rule: hes_rule) env (chcs: (refinement, refinement) chc li
   Printf.printf "%s = " rule.var.name;
   print_formula rule.body;
   print_newline();
-  let (t, m) = infer_formula track rule.body env chcs [] in
+  let (t, m) = infer_formula track rule.body env chcs [] [] in
   let m = subtype t rule.var.ty m in
   print_string "[Result]\n";
   print_constraints m;
@@ -182,14 +204,19 @@ let rec infer_hes ?(track=false) (hes: hes) env (accum: (refinement, refinement)
   | rule::xs -> 
     infer_rule track rule env accum |> infer_hes ~track:track xs env 
 
-let rec print_hes = function
-  | [] -> ()
-  | hes_rule::xs -> 
-    print_string hes_rule.var.name;
-    print_string " ";
-    print_rtype hes_rule.var.ty;
-    print_newline ();
-    print_hes xs
+let pp_rule ppf rule =
+  Fmt.pf ppf "@[%a : %a.@]"
+    Hflmc2_syntax.Print.id rule.var
+    (pp_rtype Print.Prec.zero) rule.var.ty
+
+let pp_hes ppf hes =
+  Fmt.pf ppf "@[%a@]"
+    (Fmt.list ~sep:Format.pp_force_newline pp_rule) hes
+  
+let rec print_hes x =
+  pp_hes Fmt.stdout x;
+  Fmt.flush Fmt.stdout ();
+  print_newline ()
   
 let rec dnf_size = function
   | [] -> 0
@@ -200,18 +227,63 @@ let rec dnf_size = function
 
 let simplify = normalize
 
-let print_derived_refinement_type hes constraints = 
+let formula_to_refinement fml =
+  let rec go fml = match fml with
+    | Formula.Bool true -> RTrue
+    | Bool false -> RFalse
+    | Var _ -> assert false
+    | Or fs ->
+      let rec g = function
+        | [x] -> go x
+        | x::xs -> ROr (go x, g xs)
+        | [] -> assert false
+      in
+      g fs
+    | And fs ->
+      let rec g = function
+        | [x] -> go x
+        | x::xs -> RAnd (go x, g xs)
+        | [] -> assert false
+      in
+      g fs
+    | Pred (p, as') ->
+      RPred (p, as')
+    | LsPred (p, as') ->
+      RLsPred (p, as')
+  in
+  go fml
+  
+let print_derived_refinement_type is_dual_chc (anno_env : (('a, [ `Int ] Id.t, _) Formula.gen_t * [ `Int ] Id.t list) Rid.M.t) hes constraints = 
   let rec gen_name_type_map constraints m = match constraints with
     | [] -> m
     | (id, args, body)::xs -> 
       m |> Rid.M.add id (args, body) |> gen_name_type_map xs
   in
-  let m = gen_name_type_map constraints Rid.M.empty in
+  let m =
+    gen_name_type_map constraints Rid.M.empty
+    |> Rid.M.map (fun (args, fml) -> args, if is_dual_chc then Rtype.dual fml else fml) in
+  let m' =
+    Rid.M.map
+      (fun (fml, args) ->
+        (args, formula_to_refinement fml)
+      )
+      anno_env
+  in
+  let m =
+    Rid.M.merge
+      (fun _i a b ->
+        match a, b with
+        | Some x, None | None, Some x -> Some x
+        | Some a, Some _ -> Some a
+        | None, None -> assert false
+      )
+      m
+      m' in
   let rec subst_ids map t = 
     match map with 
     | [] -> t
     | (src, dst):: xs -> 
-      t |> subst_refinement src (RArith dst) |> subst_ids xs
+      t |> subst_refinement src (RIntP(RArith(dst))) |> subst_ids xs
   in
   let rec zip l r = match (l, r) with 
     | [], [] -> []
@@ -220,7 +292,7 @@ let print_derived_refinement_type hes constraints =
   in
   let rec translate_ty = function 
     | RArrow (x, y) -> RArrow(translate_ty x, translate_ty y)
-    | RBool(RTemplate(p, l)) -> 
+    | RBool(RTemplate(p, l, _)) -> 
       let (args, body) = Rid.M.find p m in
       let map = zip args l in
       let body' = subst_ids map body in
@@ -236,6 +308,17 @@ let print_derived_refinement_type hes constraints =
       rule :: inner hes
   in
   inner hes
+
+exception ExnTractable
+exception ExnIntractable
+
+let dual_environment env =
+  Rid.M.map
+    (fun (fml, args) ->
+      let fml = Formula.mk_not fml in
+      (fml, args)
+    )
+    env
 
 (* Algorithm
 Input: hes(simply typed) env top
@@ -255,18 +338,18 @@ if unsat then returns check_feasibility
 4. if the input is evaluated to false then returns Invalid
 5. otherwise; returns Unknown
 *)
-let rec infer hes env top = 
+let rec infer anno_env hes env top = 
   let hes = List.map (fun x -> 
     let open Rhflz in 
      {x with body=Rhflz.translate_if x.body}) hes 
   in
-  let call_solver_with_timer hes solver = 
+  let call_solver_with_timer anno_env hes solver = 
     add_mesure_time "CHC Solver" @@ fun () ->
-    Chc_solver.check_sat hes solver
+    Chc_solver.check_sat anno_env hes solver
   in
-  let check_feasibility chcs = 
+  let check_feasibility anno_env chcs = 
     (* 1. generate constraints by using predicates for tracking cex *)
-    let p = Chc_solver.get_unsat_proof chcs `Eldarica in
+    let p = Chc_solver.get_unsat_proof anno_env chcs `Eldarica in
     let open Disprove in
     match disprove p hes env top with
     | `Invalid -> `Unsat
@@ -274,14 +357,26 @@ let rec infer hes env top =
   in 
   (* CHC Size is 1, then it is tractable *)
   (* size: intersection type size *)
-  let rec try_intersection_type chcs size =
+  let rec try_intersection_type anno_env chcs is_tractable =
     (* 
       if sat then return Valid
       if unsat then returns check_feasibility
     *)
-    match call_solver_with_timer chcs (Chc_solver.selected_solver 1) with
+    if not is_tractable then (
+      (if !Hflmc2_options.stop_if_intractable || !Hflmc2_options.remove_disjunctions_if_intractable then raise ExnIntractable);
+      tractability := T_Intractable
+    );
+    if is_tractable then (
+      (if !Hflmc2_options.stop_if_tractable then raise ExnTractable);
+      tractability := T_Tractable
+    );
+    let solver = Chc_solver.selected_solver is_tractable in
+    match call_solver_with_timer anno_env chcs solver with
     | `Unsat when !Hflmc2_options.Typing.no_disprove -> `Unknown
-    | `Unsat -> check_feasibility chcs     
+    | `Unsat when not is_tractable ->
+      print_string "[Warning]Currently, we cannot disprove the validity when some definite clause has or-head\n";
+      `Unknown
+    | `Unsat -> check_feasibility anno_env chcs
     | `Sat(x) -> `Sat(x)
     | `Fail -> `Fail
     | `Unknown -> `Unknown
@@ -300,33 +395,85 @@ let rec infer hes env top =
     let size = dnf_size simplified in
     Printf.printf "[Size] %d\n" size;
 
-    if size > 1 then begin
-      let dual = List.map Chc.dual constraints in
-      let simplified' = simplify dual in
-      let size_dual = dnf_size simplified' in
-      Printf.printf "[Dual Size] %d\n" size_dual;
-      let size' = if size < size_dual then size else size_dual in
-      let target = if size < size_dual then simplified else simplified' in
+    
+    if !Hflmc2_options.tractable_check_only then (
+      if size = 1 then raise ExnTractable;
+      let simplified_dual = List.map Chc.dual constraints |> simplify in
+      let size_dual = dnf_size simplified_dual in
+      if size_dual = 1 then raise ExnTractable;
+      raise ExnIntractable
+    );
+    
+    if !Hflmc2_options.solve_dual = "auto" then begin
+      if size > 1 then begin
+        let simplified_dual = List.map Chc.dual constraints |> simplify in
+        let size_dual = dnf_size simplified_dual in
+        Printf.printf "[Dual Size] %d\n" size_dual;
+        let min_size = if size < size_dual then size else size_dual in
+        let target = if size < size_dual then simplified else simplified_dual in
+        let use_dual = size >= size_dual in
+        let anno_env = if use_dual then dual_environment anno_env else anno_env in
 
-      let target' = expand target in
-      print_string "remove or or\n";
-      print_constraints target';
-      (* 3. check satisfiability *)
-      (* match call_solver_with_timer target' (Chc_solver.selected_solver 1) with
-      | `Sat(x) -> `Sat(x)
-      | `Fail -> failwith "hoge"
-      | _ ->
-        begin *)
-          if size > 1 && size_dual > 1 then (print_string "[Warning]Some definite clause has or-head\n";flush stdout)
-          else (print_string "easy\n"; flush stdout);
-          if size' > 1 then
-            call_solver_with_timer target Chc_solver.(`Fptprove)
-          else
-            try_intersection_type target size'
-        (* end *)
-    end else try_intersection_type simplified size
+        (* let target' = expand target in
+        print_string "remove or or\n";
+        print_constraints target'; *)
+        (* 3. check satisfiability *)
+        (*match call_solver_with_timer target' (Chc_solver.selected_solver 1) with
+        | `Sat(x) -> `Sat(x)
+        | `Fail -> failwith "hoge"
+        | _ ->
+          begin*)
+        if min_size > 1 then begin
+          (* if size > 1 /\ dual_size > 1 *)
+          print_string "[Warning]Some definite clause has or-head\n";
+          use_dual, try_intersection_type anno_env target false
+        end else begin
+          (* if dual_size <= 1 *)
+          use_dual, try_intersection_type anno_env target true
+        end
+        (*end*)
+      end else begin (* if size <= 1 *)
+        false, try_intersection_type anno_env simplified true
+      end
+    end else if !Hflmc2_options.solve_dual = "auto-conservative" then begin
+      if size > 1 then begin
+        let simplified_dual = List.map Chc.dual constraints |> simplify in
+        let size_dual = dnf_size simplified_dual in
+        Printf.printf "[Dual Size] %d\n" size_dual;
+        if size_dual <= 1 then
+          (* if dual_size <= 1 *)
+          true, try_intersection_type anno_env simplified_dual true
+        else begin
+          print_string "[Warning]Some definite clause has or-head\n";
+          false, try_intersection_type anno_env simplified false
+        end
+      end else begin (* if size <= 1 *)
+        false, try_intersection_type anno_env simplified true
+      end
+    end else if !Hflmc2_options.solve_dual = "dual" then begin
+      print_endline "solve dual";
+      let target = List.map Chc.dual constraints |> simplify in
+      let size_dual = dnf_size target in
+      Printf.printf "[Dual Size] %d\n" size_dual;
+      let anno_env = dual_environment anno_env in
+      if size_dual > 1 then begin
+        print_string "[Warning]Some definite clause has or-head\n";
+        true, try_intersection_type anno_env target false
+      end else begin
+        true, try_intersection_type anno_env target true
+      end
+    end else begin
+      assert (!Hflmc2_options.solve_dual = "non-dual");
+      print_endline "non-dual";
+      if size > 1 then begin
+        print_string "[Warning]Some definite clause has or-head\n";
+        false, try_intersection_type anno_env simplified false
+      end else begin
+        false, try_intersection_type anno_env simplified true
+      end
+    end
   in 
-  let x = infer_main hes env top in
+  let is_dual_chc, x = infer_main hes env top in
   report_times ();
   match x with
   | `Sat(x) -> 
@@ -334,7 +481,7 @@ let rec infer hes env top =
         match x with 
         | Ok(x) -> 
           let open Hflmc2_options in
-          let hes = print_derived_refinement_type hes x in
+          let hes = print_derived_refinement_type is_dual_chc anno_env hes x in
           if !Typing.show_refinement then
             print_hes hes
           else 

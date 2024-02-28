@@ -1,0 +1,8 @@
+%HES
+Main =v Read_int (\n. Loop n).
+
+Read_int k =v ∃n. k n.
+
+Loop n =v (n <= 0 \/ Read_int (\d. Loop (n + d))) /\ (n > 0 \/ false).
+
+/* in Loop, n should always be positive */

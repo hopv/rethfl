@@ -16,7 +16,7 @@ module Log = (val Logs.src_log log_src)
 module Subst = struct
   type 'x env = 'x IdMap.t
   module Id = struct
-    let rec arith : [`Int ] S.Id.t env -> S.Arith.t -> S.Arith.t =
+    let rec arith : 'a S.Id.t env -> S.Arith.t -> S.Arith.t =
       fun env a ->
         match a with
         | Int _ -> a
@@ -26,6 +26,17 @@ module Subst = struct
             | Some v' -> Var v'
             end
         | Op(op, as') -> Op(op, List.map ~f:(arith env) as')
+
+    let rec ls_arith : 'a S.Id.t env -> S.Arith.lt -> S.Arith.lt =
+      fun env a ->
+        match a with
+        | Nil -> a
+        | LVar v ->
+            begin match IdMap.find env v with
+            | None -> a
+            | Some v' -> LVar v'
+            end
+        | Cons(hd, tl) -> Cons(hd ,ls_arith env tl)
 
     let rec formula : [`Int ] S.Id.t IdMap.t -> S.Formula.t -> S.Formula.t =
       fun env p ->
@@ -41,11 +52,11 @@ module Subst = struct
              -> abstraction_ty =
       fun env ty -> match ty with
         | TyBool fs -> TyBool (List.map fs ~f:(formula env))
-        | TyArrow({ty=TyInt;_} as x, ty) ->
-            TyArrow(x, abstraction_ty (IdMap.remove env x) ty)
         | TyArrow({ty=TySigma ty_arg;_} as y, ret_ty) ->
             TyArrow({y with ty = TySigma (abstraction_ty env ty_arg)},
                     abstraction_ty env ret_ty)
+        | TyArrow(x, ty) ->
+            TyArrow(x, abstraction_ty (IdMap.remove env x) ty)
   end
 
   (* TODO IdMapを使う *)
@@ -64,12 +75,26 @@ module Subst = struct
     let arith : 'a. 'a S.Id.t -> S.Arith.t -> S.Arith.t -> S.Arith.t =
       fun x a a' -> arith_ S.Id.eq {x with ty=`Int} a a'
 
+    let rec ls_arith_
+              : ('lvar -> 'lvar -> bool)
+             -> 'lvar
+             -> ('avar, 'lvar) S.Arith.gen_lt
+             -> ('avar, 'lvar) S.Arith.gen_lt
+             -> ('avar, 'lvar) S.Arith.gen_lt =
+      fun equal x a a' ->
+        match a' with
+        | Nil -> a'
+        | LVar x' -> if equal x x' then a else a'
+        | Cons(hd, tl) -> Cons(hd, ls_arith_ equal x a tl)
+    let ls_arith : 'a. 'a S.Id.t -> S.Arith.lt -> S.Arith.lt -> S.Arith.lt =
+      fun x a a' -> ls_arith_ S.Id.eq {x with ty=`List} a a'
+
     let rec formula_
               : ('var -> 'var -> bool)
              -> 'var
              -> 'var S.Arith.gen_t
-             -> ('bvar,'var) S.Formula.gen_t
-             -> ('bvar,'var) S.Formula.gen_t =
+             -> ('bvar,'var, _) S.Formula.gen_t
+             -> ('bvar,'var, _) S.Formula.gen_t =
       fun equal x a p ->
         match p with
         | Pred(prim, as') -> Pred(prim, List.map as' ~f:(arith_ equal x a))
@@ -99,6 +124,7 @@ module Subst = struct
       fun x a arg ->
         match arg with
         | TyInt -> TyInt
+        | TyList -> TyList
         | TySigma(sigma) -> TySigma(abstraction_ty x a sigma)
     let abstraction_ty
           : 'a S.Id.t
@@ -126,46 +152,92 @@ module Subst = struct
             | _ -> assert false
             end
         | Op(op, as') -> Op(op, List.map ~f:(arith env) as')
-
-    let rec hflz : 'ty S.Hflz.t env -> 'ty S.Hflz.t -> 'ty S.Hflz.t =
-      fun env phi -> match phi with
-        | Var x ->
-            begin match IdMap.lookup env x with
-            | t -> t
-            | exception e -> Var x
+    let rec ls_arith : 'ty S.Hflz.t env -> S.Arith.lt -> S.Arith.lt =
+      fun env a -> match a with
+        | Nil -> a
+        | LVar x ->
+            begin match IdMap.find env x with
+            | None -> a
+            | Some (LsArith a') -> a'
+            | _ -> assert false
             end
-        | Or(phi1,phi2)  -> Or(hflz env phi1, hflz env phi2)
-        | And(phi1,phi2) -> And(hflz env phi1, hflz env phi2)
-        | App(phi1,phi2) -> App(hflz env phi1, hflz env phi2)
-        | Abs(x, t)      -> Abs(x, hflz (IdMap.remove env x) t)
-        | Forall(x, t)   -> Forall(x, hflz (IdMap.remove env x) t)
-        | Arith a        -> Arith (arith env a)
-        | Pred (p,as')   -> Pred(p, List.map ~f:(arith env) as')
-        | Bool _         -> phi
-
-    (** Invariant: phi must have type TyBool *)
-    let reduce_head : 'ty S.Hflz.hes -> 'ty S.Hflz.t -> 'ty S.Hflz.t =
-      fun hes phi -> match phi with
-      | Var x ->
-          begin match x.ty, List.find hes ~f:(fun rule -> S.Id.eq x rule.var) with
-          | TyBool _, Some phi -> phi.body
-          | _ -> invalid_arg "reduce_head"
+        | Cons(hd, tl) -> Cons(arith env hd, ls_arith env tl)
+    let rec rename_bindings (phi : 'ty S.Hflz.t): 'ty S.Hflz.t =
+      let rec go rename (phi : 'ty S.Hflz.t): 'ty S.Hflz.t = match phi with
+        | Var x -> begin
+          match IdMap.find rename x with
+          | Some v -> begin
+            let ty =
+              (match v.S.Id.ty with
+              | TySigma ty -> ty
+              | _ -> assert false) in
+            Var {v with ty}
           end
-      | App(_, _) ->
-          let head, args = S.Hflz.decompose_app phi in
-          let vars, body =
-            match S.Hflz.decompose_abs head with
-            | vars0, Var x ->
-                let x_rule =
-                  List.find_exn hes ~f:(fun rule -> S.Id.eq x rule.var)
-                in
-                let vars1, body = S.Hflz.decompose_abs x_rule.body in
-                vars0@vars1, body
-            | vars, body -> vars, body
-          in
-          let env = IdMap.of_list @@ List.zip_exn vars args in
-          hflz env body
-      | _ -> invalid_arg "reduce_head"
+          | None -> Var x
+        end
+        | Or (phi1, phi2) ->
+          Or (go rename phi1, go rename phi2)
+        | And (phi1, phi2) ->
+          And (go rename phi1, go rename phi2)
+        | App (phi1, phi2) ->
+          App (go rename phi1, go rename phi2)
+        | Abs (x_, t) ->
+          let x = { x_ with id = S.Id.gen_id () } in
+          Abs (x, go (IdMap.add rename x_ x) t)
+        | Forall (x_, t) ->
+          let x = { x_ with id = S.Id.gen_id () } in
+          Forall (x, go (IdMap.add rename x_ x) t)
+        | Bool b -> Bool b
+        | Arith _ | Pred _ ->
+          let rename =
+            IdMap.filter_map
+              rename
+              ~f:(fun a ->
+                match a.S.Id.ty with
+                | TyInt -> Some (S.Hflz.Arith (S.Arith.Var ({a with ty=`Int})))
+                |  _ -> None
+              ) in
+          hflz rename phi
+        | LsArith _ | LsPred _ ->
+          let rename =
+            IdMap.filter_map
+              rename
+              ~f:(fun a ->
+                match a.S.Id.ty with
+                | TyList -> Some (S.Hflz.LsArith (S.Arith.LVar ({a with ty=`List})))
+                | _ -> None
+              ) in
+          hflz rename phi in
+      go IdMap.empty phi
+    and hflz : 'ty S.Hflz.t env -> 'ty S.Hflz.t -> 'ty S.Hflz.t =
+      fun env_ phi ->
+        let rec hflz_ s_env b_env (phi : 'ty S.Hflz.t): 'ty S.Hflz.t = match phi with
+          | Var x ->
+              begin match IdMap.lookup s_env x with
+              | t -> rename_bindings t
+              | exception Core.Not_found_s _ -> Var x
+              end
+          | Or(phi1,phi2)  ->
+            Or(hflz_ s_env b_env phi1, hflz_ s_env b_env phi2)
+          | And(phi1,phi2) ->
+            And(hflz_ s_env b_env phi1, hflz_ s_env b_env phi2)
+          | App(phi1,phi2) ->
+            App(hflz_ s_env b_env phi1, hflz_ s_env b_env phi2)
+          | Abs(x, t)      ->
+            Abs(x, hflz_ (IdMap.remove s_env x) (IdSet.add b_env x) t)
+          | Forall(x, t)   ->
+            Forall(x, hflz_ (IdMap.remove s_env x) (IdSet.add b_env x) t)
+          | Arith a        ->
+            Arith (arith s_env a)
+          | LsArith a        ->
+            LsArith (ls_arith s_env a)
+          | Pred (p,as')   ->
+            Pred(p, List.map ~f:(arith s_env) as')
+          | LsPred (p,as')   ->
+            LsPred(p, List.map ~f:(ls_arith s_env) as')
+          | Bool _         -> phi
+        in
+        hflz_ env_ IdSet.empty phi
   end
 
   module Hfl = struct
@@ -174,7 +246,7 @@ module Subst = struct
         | Var x ->
             begin match IdMap.lookup env x with
             | t -> t
-            | exception Not_found -> Var x
+            | exception Core.Not_found_s _ -> Var x
             end
         | Bool _         -> phi
         | Or(phis,k)     -> Or(List.map ~f:(hfl env) phis, k)
@@ -281,8 +353,7 @@ module Reduce = struct
             let dep =
               Hflz.fvs rule.body
               |> IdSet.filter ~f:begin fun x -> (* filter nonterminals *)
-                  let c = String.get x.Id.name 0 in
-                  c == Char.uppercase c (* XXX ad hoc *)
+                  Id.is_pred_name x.Id.name (* XXX ad hoc ? *)
                  end
             in Id.remove_ty id ,dep
           end
@@ -372,8 +443,9 @@ module Simplify = struct
           let phi2 = go phi2 in
           let phis = List.filter ~f:Fn.(not <<< is_trivially_false) [phi1;phi2] in
           Hflz.mk_ors phis
-      | Abs(x,phi)     -> Abs(x, go phi)
-      | App(phi1,phi2) -> App(go phi1, go phi2)
+      | Abs(x, phi)     -> Abs(x, go phi)
+      | App(phi1, phi2) -> App(go phi1, go phi2)
+      | Forall(x, phi)  -> Forall(x, go phi)
       | phi -> phi
     in go
   let hflz_hes_rule : 'a Hflz.hes_rule -> 'a Hflz.hes_rule =
@@ -430,10 +502,10 @@ module Simplify = struct
 
   let rec formula
             : 'bvar 'avar
-            . ?is_true:(('bvar, 'avar) Formula.gen_t -> bool)
-           -> ?is_false:(('bvar, 'avar) Formula.gen_t -> bool)
-           -> ('bvar, 'avar) Formula.gen_t
-           -> ('bvar, 'avar) Formula.gen_t =
+            . ?is_true:(('bvar, 'avar, _) Formula.gen_t -> bool)
+           -> ?is_false:(('bvar, 'avar, _) Formula.gen_t -> bool)
+           -> ('bvar, 'avar, _) Formula.gen_t
+           -> ('bvar, 'avar, _) Formula.gen_t =
     fun ?(is_true=is_true_def) ?(is_false=is_false_def) -> function
     | Formula.And phis ->
         let phis = List.map ~f:formula phis in
@@ -456,125 +528,6 @@ module Simplify = struct
           | _     -> Or phis
         end
     | phi -> phi
-end
-
-module RemoveDisjunction = struct
-  (* remove disjunction translator *)
-  (**
-  A is valid <=> [A]false is valid
-  [true]k = true
-  [false]k = k
-  [e1<e2]k = e1<e2 ∨ k  (i.e. e1>=e2 => k)
-  [A∨B]k = [A]([B]k)
-  [A∧B]k = [A]k ∧ [B]k
-  [νX.A] = νX.[A]
-  [∀x.A]k = ∀x. [A]k
-  [A B] = [A] [B]
-  [A e] = [A] e
-  [λX.A] = λX.[A]
-  [X] = X
-  **)
-
-  let gen_cont_var () = 
-    (*let t = Type.TyArrow(
-      tmp_arg, Type.TyBool()) in*)
-    let t = Type.TyBool () in
-    Id.gen t 
-
-  (* check if the translation is required.
-  *)
-  let rec check_body in_disj = function
-    | Hflz.Bool _ 
-    | Hflz.Pred _
-    | Hflz.Arith _ -> false
-    | Hflz.Or(x, y) -> 
-      check_body true x || check_body true y
-    | Hflz.And(x, y) ->
-      check_body in_disj x || check_body in_disj y
-    | Hflz.Abs(_, y) -> check_body in_disj y
-    | Hflz.Forall(_, y) -> check_body in_disj y
-    | Hflz.App _ when in_disj -> true
-    | Hflz.App (x, y) -> check_body in_disj x || check_body in_disj y
-    | Hflz.Var x when in_disj -> begin
-      match x.ty with
-      | Type.TyBool _ -> true
-      | _ -> false
-      end
-    | Hflz.Var _ -> false
-
-  let check_hes_rule (rule:Type.simple_ty Hflz.hes_rule)
-     = check_body false rule.body
-
-  let rec check = function
-  | [] -> false
-  | x::xs -> check_hes_rule x || check xs
-
-  let tmp_arg = Type.TyBool ()  
-      |> Id.gen
-      |> Type.lift_arg
-  let prop2prop = Type.TyArrow(tmp_arg, Type.TyBool())
-
-  let rec lift_ty (t:Type.simple_ty) = (match t with
-    | Type.TyBool _ -> prop2prop
-    | Type.TyArrow(x, y) -> 
-      let x' = lift_ty_arg x in
-      let y' = lift_ty y in
-      Type.TyArrow(x', y'))
-  and lift_ty_arg (t:Type.simple_argty Id.t) = match t.ty with
-    | Type.TyInt -> t
-    | Type.TySigma x -> 
-      {t with ty=Type.TySigma (lift_ty x)}
-  
-  let rec translate_body body =
-    let open Hflz in
-    let ret_k = gen_cont_var () in
-    let k = Type.lift_arg ret_k in
-    let ret_k_var = Var ret_k in
-    match body with 
-    | Bool true -> Abs(k, Bool true)
-    | Bool false -> Abs(k, ret_k_var)
-    | Pred(p, l) -> Abs(k, Or(Pred(p, l), ret_k_var))
-    | Or(x, y) -> 
-      let x' = translate_body x in
-      let y' = translate_body y in
-      Abs(k, App(x', App(y', ret_k_var)))
-    | And(x, y) -> 
-      let x' = translate_body x in
-      let y' = translate_body y in
-      Abs(k, And(App(x', ret_k_var), App(y', ret_k_var)))
-    | Forall(x, y) -> 
-      let y' = translate_body y in
-      Abs(k, Forall(x, App(y', ret_k_var)))
-    | App(x, y) -> 
-      let x' = translate_body x in
-      let y' = translate_body y in
-      App(x', y')
-    | Arith x -> Arith x
-    | Abs(id, y) -> 
-      let y' = translate_body y in
-      let id = lift_ty_arg id in
-      Abs(id, y')
-    | Var x -> Var x
-  
-  let translate_hes_rule (rule : Type.simple_ty Hflz.hes_rule) = 
-    {rule with body=translate_body rule.body}
-
-
-  let rec translate_aux top (rule:Type.simple_ty Hflz.hes_rule) =
-    if Id.eq rule.var top then
-      let body = Hflz.App(rule.body, Bool false) in
-      {rule with body}
-    else
-      let ty = lift_ty rule.var.ty in
-      let var = {rule.var with ty} in
-      {rule with var}
-
-  let f rules top = if check rules then
-    (Printf.printf "[REMOVE_DISJUNCTION]\n";
-    List.map ~f:(fun x -> x|>translate_hes_rule|>translate_aux top) rules)
-  else
-    (Printf.printf "[NO_DISJUNCTION]\n"; rules)
-
 end
 
 module Preprocess = struct

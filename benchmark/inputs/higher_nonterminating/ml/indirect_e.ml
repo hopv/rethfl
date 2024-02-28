@@ -1,3 +1,4 @@
+(* 途中にappを介してgを0になるまで再帰呼び出し。負値だと停止しない *)
 let app f (x:int) (u:unit) = (f x u: unit)
 let id (u:unit) = u
 let rec g (x:int) =

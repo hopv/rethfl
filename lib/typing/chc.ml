@@ -24,6 +24,7 @@ let rec find_and_cut_substs rt ids = match rt with
     (RTrue, (x, RArith(y)) :: ids)
   | x -> (x, ids)
 
+(*
 let subst_chc chc = 
   let (body', substs) = find_and_cut_substs chc.body [] in
   let rec inner l rt = match l with
@@ -34,7 +35,7 @@ let subst_chc chc =
   let head = inner substs chc.head in
   let body = inner substs body' in
   {head=head; body=body}
-
+*)
 (* refinemenet listではなくandのないrefinementを定義したいが、きれいにやる方法がよく分からないので、とりあえず、書く *)
 type dnf = refinement list
 type cnf = refinement list
@@ -148,9 +149,9 @@ let normalize chcs =
       let (x, a) = rename_rty x in
       let (y, b) = rename_rty y in
       ROr(x, y), (conjoin a b)
-    | RTemplate(p, l) -> 
+    | RTemplate(p, l, l2) -> 
         let (l, ret) = rename l IdSet.empty RTrue in
-        RTemplate(p, l), ret
+        RTemplate(p, l, l2), ret
     | RFalse -> RFalse, RTrue
     | _ -> failwith "program error(normalize)"
   in
@@ -184,7 +185,7 @@ let rec underapproximate chcs =
 let expand chcs = 
   let rec gen_map chcs m = match chcs with
     | [] -> m
-    | {head=RTemplate(p, l); body=body}::xs -> 
+    | {head=RTemplate(p, l, _); body=body}::xs -> 
       let cnt' = count_preds body in
       begin
         match Rid.M.find_opt p m with
@@ -215,11 +216,11 @@ let expand chcs =
     in
     match head with
     | ROr(x, y) -> ROr(expand_one_step' x, expand_one_step' y)
-    | RTemplate(p, l) when Rid.M.mem p m ->
+    | RTemplate(p, l, _) when Rid.M.mem p m ->
       let (l', body, _) = Rid.M.find p m in
       (* subst l' -> l of body *)
       let l'' = arith_var_list_to_id_list l' in
-      let l''' = List.map (fun x -> RArith x) l in
+      let l''' = List.map (fun x -> RIntP(RArith x)) l in
       let sl = zip l'' l''' in
       let body' = subst_refinement_with_ids body sl in
       body'

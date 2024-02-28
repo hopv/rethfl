@@ -1,5 +1,27 @@
+type process_status = Unix.process_status
+
 module Core = Core
 open Core
+
+let generated_temp_files : string list ref = ref []
+let () = Random.self_init ()
+let gen_temp_filename prefix suffix =
+  let random_string = Printf.sprintf "%d_%d" (Random.int 0x10000000) (Random.int 0x10000000) in
+  let filename = prefix ^ random_string ^ suffix in
+  generated_temp_files := filename :: !generated_temp_files;
+  filename
+
+let remove_generated_files () =
+  List.iter
+    ~f:(fun f ->
+      try
+        Stdlib.Sys.remove f
+        (* ; print_endline @@ "removed: " ^f  *)
+      with Sys_error _e -> ()
+        (* ; print_endline @@ "Error when removeing temporary files (" ^ _e ^ ")" *)
+    )
+    !generated_temp_files;
+  generated_temp_files := []
 
 module Pair = struct
   (* Bifunctor method *)
@@ -182,6 +204,10 @@ module Fn = struct
   let neg i = -i
   let const x _ = x
 
+  let print ?(tag="") pp x =
+    match tag with
+    | "" -> Format.printf "@[%a@]@." pp x
+    | _ -> Format.printf "%s: @[%a@]@." tag pp x
 
   let on injection g x y = g (injection x) (injection y)
 
@@ -197,9 +223,22 @@ module Fn = struct
   let assert_no_exn f =
     try f () with e -> print_endline (Exn.to_string e); assert false
 
+  let pp_process_result fmt stat out err =
+    let show_process_status : process_status -> string = function
+      | WEXITED code -> "WEXITED(" ^ (string_of_int code) ^ ")"
+      | WSIGNALED code -> "WSIGNALED(" ^ (string_of_int code) ^ ")"
+      | WSTOPPED code -> "WSTOPPED(" ^ (string_of_int code) ^ ")" in
+    Format.pp_print_string fmt @@ "Process result:\n";
+    Format.pp_print_string fmt @@ "out: " ^ out ^ "\n";
+    Format.pp_print_string fmt @@ "status: " ^ (show_process_status stat) ^ "\n";
+    Format.pp_print_string fmt @@ "err: " ^ err ^ "\n";
+    Format.print_flush ()
+    
   let run_command ?(timeout=20.0) cmd =
+    print_endline @@ "RUNNING COMMAND: \"" ^ String.concat ~sep:" " (Array.to_list cmd) ^ "\"";
     let f_out, fd_out = Unix.mkstemp "/tmp/run_command.stdout" in
     let f_err, fd_err = Unix.mkstemp "/tmp/run_command.stderr" in
+    generated_temp_files := f_out :: f_err :: !generated_temp_files;
     let process_status = Lwt_main.run @@
       Lwt_process.exec
         ~timeout
@@ -211,6 +250,9 @@ module Fn = struct
     let stderr = read_file f_err in
     Unix.remove f_out;
     Unix.remove f_err;
+    print_endline @@ "RAN COMMAND: \"" ^ String.concat ~sep:" " (Array.to_list cmd) ^ "\"";
+    pp_process_result Format.std_formatter process_status stdout stderr;
+    print_endline "";
     (process_status, stdout, stderr)
 
   class counter = object
@@ -259,3 +301,8 @@ module Logs_cli = Logs_cli
 module Logs_fmt = Logs_fmt
 
 type ('a, 'b) result = Ok of 'a | Error of 'b
+
+let lsplit2_fst s ~on =
+  match String.lsplit2 ~on:on s with
+  | Some (s, s') -> s, Some s'
+  | None -> s, None

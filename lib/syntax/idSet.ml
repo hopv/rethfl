@@ -6,3 +6,5 @@ let remove : 'a. t -> 'a Id.t -> t =
   fun set x -> remove set (Id.remove_ty x)
 let mem set x = mem set (Id.remove_ty x)
 let add set x = add set (Id.remove_ty x)
+
+let union set1 set2 = union set1 set2

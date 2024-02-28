@@ -14,9 +14,37 @@ exception Infeasible
 let rid_of_arithid id = 
   Id.({name=id.name; id=id.id; ty=Rtype.RInt(RId(id))})
 
+let show_fixpoint = function
+  | Fixpoint.Greatest -> "v"
+  | Fixpoint.Least -> "u"
+
+let print_rhflz_hes hes =
+  List.iter
+    (fun {Rhflz.body; var; fix} ->
+      print_string @@ Id.to_string var;
+      print_string " =";
+      print_string @@ show_fixpoint fix;
+      print_string " ";
+      Rhflz.print_formula body;
+      print_string "\n"
+    )
+    hes
+
+let print_count_map (map : (Rtype.t Id.t * int list) list list) =
+  List.map (fun id_args ->
+    match id_args with
+    | [] -> ""
+    | (id, _)::_ ->
+      Id.to_string id ^ " -> " ^
+        (List.map (fun (_, args) -> "(" ^ (List.map string_of_int args |> String.concat ",") ^ ")") id_args |> String.concat "\n")
+  ) map
+  |> String.concat "\n"
+  
 let disprove unsat_proof hes env top = 
   (* no recursive hes *)
-  let hes = Expand.expand unsat_proof hes in
+  let hes, args_map = Expand.expand unsat_proof hes in
+  print_rhflz_hes hes;
+  print_endline @@ print_count_map args_map;
   let fml = (Rhflz.lookup_rule top hes).body in
   let eval fml = 
     (* evaluator *)

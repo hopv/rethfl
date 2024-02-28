@@ -56,6 +56,7 @@ end = struct
             | I.T_PLUS      -> "PLUS"
             | I.T_OR        -> "OR"
             | I.T_NEQ       -> "NEQ"
+            | I.T_NEQL      -> "NEQL"
             | I.T_NEG       -> "NEG"
             | I.T_MINUS     -> "MINUS"
             | I.T_LSQUARE   -> "LSQUARE"
@@ -68,6 +69,7 @@ end = struct
             | I.T_GE        -> "GE"
             | I.T_FALSE     -> "FALSE"
             | I.T_EQ        -> "EQ"
+            | I.T_EQL       -> "EQL"
             | I.T_EOF       -> "EOF"
             | I.T_DOT       -> "DOT"
             | I.T_COLON     -> "COLON"
@@ -82,6 +84,8 @@ end = struct
             | I.T_FORALL    -> "FORALL"
             | I.T_SLASH     -> "SLASH"
             | I.T_PERCENT   -> "PERCENT"
+            | I.T_NIL       -> "NIL"
+            | I.T_CONS       -> "CONS"
             end
         | I.X (I.N x) -> print @@ begin match x with
             | I.N_uvar                     -> "uvar"

@@ -19,3 +19,8 @@ Loop h n =v
 App n k =v k n.
 
 
+/*
+%HES
+Main =v ∃r. Loop r.
+Loop n =v if n > 0 then (∃d. Loop (n + d)) else false.
+*/

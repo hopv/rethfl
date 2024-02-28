@@ -12,6 +12,13 @@ let gen_map nodes =
   ) M.empty nodes
 
 
+let gen_args_map nodes = 
+  List.fold_left (fun m x -> 
+    match M.find_opt x.name m with
+    | Some(l) -> M.add x.name ((x, x.args)::l) m
+    | None -> M.add x.name [x, x.args] m
+  ) M.empty nodes
+
 let expand unsat_proof hes =
   let map = gen_map unsat_proof in
   let expand_forall rule = 
@@ -55,7 +62,7 @@ let expand unsat_proof hes =
     end
   in
   let count_rule map rule = 
-    let id, _ = Rtype.get_top rule.var.ty in
+    let id, _, _ = Rtype.get_top rule.var.ty in
     List.length @@ (match M.find_opt id map with Some(l) -> l | None -> [])
   in
   let rec subst_rules fml var rules = 
@@ -92,5 +99,11 @@ let expand unsat_proof hes =
       let rules' = subst_rules fml rule.var rules in
       expand_rule xs rules'
   in
-  expand_rule hes hes
+  let args_map =
+    let map = gen_args_map unsat_proof in
+    List.map (fun rule ->
+      let id, _, _ = Rtype.get_top rule.var.ty in
+      match M.find_opt id map with Some(l) -> List.map (fun (_, args) -> (rule.var, args)) l | None -> []
+    ) hes in
+  expand_rule hes hes, args_map
 

@@ -12,7 +12,9 @@ type 'ty t =
   | App    of 'ty t * 'ty t
   (* constructers only for hflz *)
   | Arith  of Arith.t
+  | LsArith of Arith.lt
   | Pred   of Formula.pred * Arith.t list
+  | LsPred of Formula.ls_pred * Arith.lt list
   [@@deriving eq,ord,show,iter,map,fold,sexp]
 
 type 'ty hes_rule =
@@ -74,7 +76,9 @@ let rec fvs = function
   | Abs(x,phi)     -> IdSet.remove (fvs phi) x
   | Forall (x,phi) -> IdSet.remove (fvs phi) x
   | Arith a        -> IdSet.of_list @@ List.map ~f:Id.remove_ty @@ Arith.fvs a
+  | LsArith a      -> IdSet.of_list @@ Arith.lfvs_notype a
   | Pred (_,as')   -> IdSet.union_list @@ List.map as' ~f:begin fun a ->
                         IdSet.of_list @@ List.map ~f:Id.remove_ty @@ Arith.fvs a
                       end
+  | LsPred(_,as')  -> IdSet.of_list @@ List.concat @@ List.map as' ~f:Arith.lfvs_notype
 

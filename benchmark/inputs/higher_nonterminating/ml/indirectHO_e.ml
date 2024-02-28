@@ -1,3 +1,4 @@
+(* indirect_eに比べて、引数にunitが増えている。本質的に何か変わるのか？ *)
 let read_int2 () =
   let res = read_int () in
   if res <= (-3) then
