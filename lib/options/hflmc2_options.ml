@@ -113,7 +113,7 @@ type params =
   ; mode_burn_et_al: bool [@default false] [@docs "Typing"] [@docv "Use the subtyping rule of burn et al"]
   (** Use Subtying rule in burn et al *)
 
-  ; no_disprove: bool [@default false]
+  ; no_disprove: bool [@default true]
     (** Disable disproving*)
     
   ; tractable_check_only: bool [@default false]
@@ -122,7 +122,7 @@ type params =
   
   ; stop_if_tractable : bool [@default false]
   
-  ; remove_disjunctions_if_intractable : bool [@default false]
+  ; remove_disjunctions_if_intractable : bool [@default true]
   
   ; remove_disjunctions : bool [@default false]
   

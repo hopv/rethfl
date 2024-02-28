@@ -12,9 +12,8 @@ type 'ty t =
   | App    of 'ty t * 'ty t
   (* constructers only for hflz *)
   | Arith  of Arith.t
-  | LsArith of Arith.lt
-  | Pred   of Formula.pred * Arith.t list
-  | LsPred of Formula.ls_pred * Arith.lt list
+  | LsExpr of Arith.lt
+  | Pred of Formula.pred * Arith.t list * Arith.lt list
   [@@deriving eq,ord,show,iter,map,fold,sexp]
 
 type 'ty hes_rule =
@@ -43,7 +42,7 @@ let mk_ors = function
   | [] -> Bool false
   | x::xs -> List.fold_left xs ~init:x ~f:(fun a b -> Or(a,b))
 
-let mk_pred pred a1 a2 = Pred(pred, [a1;a2])
+let mk_pred pred a1 a2 = Pred(pred, [a1;a2], [])
 
 let mk_arith a = Arith a
 
@@ -75,10 +74,10 @@ let rec fvs = function
   | App(phi1,phi2) -> IdSet.union (fvs phi1) (fvs phi2)
   | Abs(x,phi)     -> IdSet.remove (fvs phi) x
   | Forall (x,phi) -> IdSet.remove (fvs phi) x
-  | Arith a        -> IdSet.of_list @@ List.map ~f:Id.remove_ty @@ Arith.fvs a
-  | LsArith a      -> IdSet.of_list @@ Arith.lfvs_notype a
-  | Pred (_,as')   -> IdSet.union_list @@ List.map as' ~f:begin fun a ->
-                        IdSet.of_list @@ List.map ~f:Id.remove_ty @@ Arith.fvs a
-                      end
-  | LsPred(_,as')  -> IdSet.of_list @@ List.concat @@ List.map as' ~f:Arith.lfvs_notype
+  | Arith a        -> IdSet.of_list @@ Arith.fvs_notype a
+  | LsExpr a      -> IdSet.of_list @@ Arith.lfvs_notype a
+  | Pred(_,as',ls')  ->
+    let fvs1 = List.concat @@ List.map as' ~f:Arith.fvs_notype in
+    let fvs2 = List.concat @@ List.map ls' ~f:Arith.lfvs_notype in
+    IdSet.of_list @@ List.append fvs1 fvs2
 

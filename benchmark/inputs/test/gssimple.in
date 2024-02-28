@@ -1,0 +1,5 @@
+%HES
+S =v ∀ls. G ls 2.
+G ls u =v u > 0 /\ ∀hd.∀tl.
+(ls <>l (hd :: tl) \/
+  (hd <> 0 \/ G tl (u - 1))).

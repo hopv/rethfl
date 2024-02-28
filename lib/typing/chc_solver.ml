@@ -94,8 +94,20 @@ let selected_cex_cmd = function
     [|"eld"; "-cex";  "-hsmt"|]
   | _ -> failwith "you cannot use this"
 
-let prologue = "(declare-fun XX ( (List Int)) Bool)
+let prologue_hoice = "(declare-fun Length (Int (List Int)) Bool)
+(assert (forall ((ls (List Int))) (=> (= ls nil) (Length 0 ls))))
+(assert (forall ((n Int)(hd Int)(tl (List Int))) (=> (Length n tl) (Length (+ 1 n) (insert hd tl)))))
 "
+
+let prologue = "(set-logic HORN)
+(declare-datatypes ((List 0)) (((insert (head Int) (tail List)) (nil))))
+"
+
+let get_prologue =
+  function
+  | `Hoice -> prologue_hoice
+  | _ -> prologue
+
 
 let get_epilogue = 
   function 
@@ -131,34 +143,31 @@ let rec collect_preds chcs m =
     m |> inner chc.body |> inner chc.head |> collect_preds chcs
 
 let collect_vars chc = 
-  let collect_from_arith a m =
-    let fvs = Arith.fvs a in
-    List.fold_left IdSet.add m fvs
+  let collect_from_arith a m1 m2 =
+    let (afvs, lfvs) = Arith.fvs a in
+    (List.fold_left IdSet.add m1 afvs, List.fold_left IdSet.add m2 lfvs)
   in
-  let rec collect_from_ariths ars m = match ars with
-    | [] -> m
+  let rec collect_from_ariths ars m1 m2 = match ars with
+    | [] -> (m1, m2)
     | x::xs -> 
-      m |> collect_from_arith x |> collect_from_ariths xs
+      let (set1, set2) = collect_from_arith x m1 m2 in
+      collect_from_ariths xs set1 set2
   in
-  let collect_from_ls_arith a m1 m2 =
+  let collect_from_lsexpr a m1 m2 =
     let (afvs, lfvs) = Arith.lfvs a in
     (List.fold_left IdSet.add m1 afvs, List.fold_left IdSet.add m2 lfvs)
   in
-  let rec collect_from_ls_ariths ars m1 m2 = match ars with
+  let rec collect_from_lsexprs ars m1 m2 = match ars with
     | [] -> (m1, m2)
     | x::xs ->
-      let (set1, set2) = collect_from_ls_arith x m1 m2 in
-      collect_from_ls_ariths xs set1 set2
+      let (set1, set2) = collect_from_lsexpr x m1 m2 in
+      collect_from_lsexprs xs set1 set2
   in
   let rec inner rt m1 m2 = match rt with
-  | RTemplate(_, l, ls) -> 
-    let avar1 = collect_from_ariths l m1 in
-    let (avar2, lvar) = collect_from_ls_ariths ls m1 m2 in
-    (IdSet.union avar1 avar2, lvar)
-  | RPred(_, l) ->
-    collect_from_ariths l m1, m2
-  | RLsPred(_, ls) ->
-    collect_from_ls_ariths ls m1 m2
+  | RTemplate(_, l, ls) | RPred(_, l, ls) -> 
+    let (avar1, lvar1) = collect_from_ariths l m1 m2 in
+    let (avar2, lvar2) = collect_from_lsexprs ls m1 m2 in
+    (IdSet.union avar1 avar2, IdSet.union lvar1 lvar2)
   | RAnd(x, y) | ROr(x, y) ->
     let (m1, m2) = inner x m1 m2 in
     inner y m1 m2
@@ -171,7 +180,7 @@ let collect_vars chc =
 let gen_assert solver chc =
   let (avars, lvars) = collect_vars chc in
   let vars_s = avars |> IdSet.to_list |> List.map var_def |> List.fold_left (^) "" in
-  let lvars_s = lvars |> IdSet.to_list |> List.map lvar_def |> List.fold_left (^) "" in
+  let lvars_s = lvars |> IdSet.to_list |> List.map (lvar_def solver) |> List.fold_left (^) "" in
   let vars_s = vars_s ^ lvars_s in
   let body = ref2smt2 chc.body in
   let head = ref2smt2 chc.head in
@@ -192,10 +201,10 @@ let chc2smt2 env chcs solver =
         | None -> true
       )
       preds in
-  let def = preds |> Rid.M.bindings |> List.map pred_def |> List.fold_left (^) "" in
+  let def = preds |> Rid.M.bindings |> List.map (pred_def solver) |> List.fold_left (^) "" in
   let concrete_def = env |> Rid.M.bindings |> List.map pred_concrete_def |> List.fold_left (^) "" in
   let body = chcs |> List.map (gen_assert solver) |> List.fold_left (^) "" in
-  prologue ^ def ^ concrete_def ^ body ^ (get_epilogue solver)
+  (get_prologue solver) ^ def ^ concrete_def ^ body ^ (get_epilogue solver)
 
 
 let parse_model model = 
@@ -206,10 +215,12 @@ let parse_model model =
   let open Sexp in
   let fail f s = invalid_arg @@ f ^ ": " ^ Sexp.to_string s in
   let mk_var name =
-     Id.{ name; id=0; ty=`Int }
-  in
+     Id.{ name; id=0; ty=`Int } in
+  let mk_lvar name =
+     Id.{ name; id=0; ty=`List } in
   let parse_arg = function
     | List [Atom v; Atom "Int" ] -> mk_var v
+    | List [Atom v; List [Atom "List"; Atom "Int"]] -> mk_lvar v 
     | s -> fail "parse_arg" s
   in
   let rec parse_arith = function
@@ -244,6 +255,18 @@ let parse_model model =
             end
     | s -> fail "parse_arith" s
   in
+  let rec parse_list = function
+    | Atom "nil" -> Arith.Opl(Arith.Nil, [], [])
+    | Atom v0 -> Arith.mk_lvar (mk_lvar v0)
+    | List [Atom "insert"; hd; tl] ->
+        let head = parse_arith hd in
+        let tail = parse_list tl in
+        Arith.Opl(Arith.Cons, [head], [tail])
+    | List [Atom "tail"; ls] ->
+        let ls = parse_list ls in
+        Arith.Opl(Arith.Cons, [], [ls])
+    | s -> fail "parse_list" s
+  in
   let rec parse_formula = function
     | Atom "true"  -> RTrue
     | Atom "false" -> RFalse
@@ -262,8 +285,12 @@ let parse_model model =
           | s     -> fail "parse_formula:list" (Atom s)
         in
         begin match a with
+        | `Pred Formula.Eq ->
+            let a = try RPred (Formula.Eq, (List.map ~f:parse_arith ss),[]) with
+            | _ -> RPred (Formula.Eql, [], (List.map ~f:parse_list ss)) in
+            a
         | `Pred pred ->
-            RPred (pred, (List.map ~f:parse_arith ss))
+            RPred (pred, (List.map ~f:parse_arith ss), (List.map ~f:parse_list ss))
         | `And ->
             let  [@warning "-8"] a::as' = List.map ss ~f:parse_formula in
             List.fold_left ~init:a as' ~f:(fun x y -> RAnd(x, y))
@@ -300,8 +327,13 @@ let parse_model model =
   match Sexplib.Sexp.parse model with
   | Done(model, _) -> begin 
     match model with
-    | List (Atom "model" :: sol) ->
-        Ok(List.map ~f:parse_def sol)
+    | List (Atom "model" :: sol) -> (* Eliminate the definition of Length *)
+        let defs = List.filter sol ~f:begin
+      fun x -> match x with
+        List [Atom "define-fun"; Atom "Length"; _] -> false
+        | _ -> true
+      end in
+        Ok(List.map ~f:parse_def defs)
     | _ -> Error "parse_model" 
     end
   | _ -> Error "failed to parse model"

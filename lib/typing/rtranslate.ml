@@ -53,9 +53,8 @@ let rec translate_body env body =
     App(translate_body env x, translate_body env y, template)
   | Hflz.Bool x -> Bool x
   | Hflz.Arith x -> Arith x
-  | Hflz.LsArith x -> LsArith x
-  | Hflz.Pred (x, y) -> Pred (x, y)
-  | Hflz.LsPred (x, y) -> LsPred (x, y)
+  | Hflz.LsExpr x -> LsExpr x
+  | Hflz.Pred (x, y, z) -> Pred (x, y, z)
   
 let translate_rule
   (formula: Type.simple_ty Hflz.hes_rule)

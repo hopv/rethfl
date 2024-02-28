@@ -7,7 +7,7 @@ type rint =
   | RArith of Arith.t
 type rlist =
   | RLId of [`List] Id.t
-  | RLsArith of Arith.lt
+  | RLsExpr of Arith.lt
 and t 
   = RBool of refinement
   | RArrow of t * t
@@ -16,8 +16,7 @@ and t
 and refinement
   = RTrue
    | RFalse
-   | RPred of Formula.pred * Arith.t list
-   | RLsPred of Formula.ls_pred * Arith.lt list
+   | RPred of Formula.pred * Arith.t list * Arith.lt list
    | RAnd of refinement * refinement
    | ROr of refinement * refinement
    | RExists of [`Int | `List] Id.t * refinement
@@ -74,7 +73,7 @@ let pp_template ppf (id, l, ls) =
   Fmt.pf ppf "@[X%d(@[<hv 0>%a@];@[<hv 0>%a@])@]"
     id
     (Fmt.list ~sep:pp_comma Print.arith) l
-    (Fmt.list ~sep:pp_comma Print.ls_arith) ls
+    (Fmt.list ~sep:pp_comma Print.lsexpr) ls
 let print_template : template -> unit = fun (id, x, ls) ->
   pp_template Fmt.stdout (id, x, ls);
   Fmt.flush Fmt.stdout ()
@@ -87,8 +86,8 @@ let pp_rint ppf = function
 let pp_rlist ppf = function
   | RLId x -> 
     Print.id ppf x
-  | RLsArith x -> 
-    Print.ls_arith ppf x
+  | RLsExpr x -> 
+    Print.lsexpr ppf x
 
 let rtype_pred : Formula.pred Fmt.t =
   fun ppf pred -> match pred with
@@ -98,29 +97,22 @@ let rtype_pred : Formula.pred Fmt.t =
     | Ge  -> Fmt.string ppf ">="
     | Lt  -> Fmt.string ppf "<"
     | Gt  -> Fmt.string ppf ">"
-  
-let rtype_ls_pred : Formula.ls_pred Fmt.t =
-  fun ppf pred -> match pred with
     | Eql  -> Fmt.string ppf "=l"
     | Neql -> Fmt.string ppf "!=l"
 
 let rec pp_refinement prec ppf = function
   | RTrue -> Fmt.string ppf "true"
   | RFalse -> Fmt.string ppf "false"
-  | RPred (x, [f1; f2]) -> 
+  | RPred (x, [f1; f2], []) -> 
     Print.show_paren (prec > Print.Prec.eq) ppf "@[<hv 0>%a@ %a@ %a@]"
       Print.arith f1
       rtype_pred x
       Print.arith f2
-  | RPred (x, _) -> 
-    rtype_pred ppf x
-  | RLsPred (x, [f1; f2]) -> 
+  | RPred (x, [], [f1; f2]) -> 
     Print.show_paren (prec > Print.Prec.eq) ppf "@[<hv 0>%a@ %a@ %a@]"
-      Print.ls_arith f1
-      rtype_ls_pred x
-      Print.ls_arith f2
-  | RLsPred (x, _) -> 
-    rtype_ls_pred ppf x
+      Print.lsexpr f1
+      rtype_pred x
+      Print.lsexpr f2
   | RAnd(x, y) -> 
     Print.show_paren (prec > Print.Prec.and_) ppf "@[<hv 0>%a@ /\\ %a@]"
       (pp_refinement Print.Prec.and_) x
@@ -134,6 +126,7 @@ let rec pp_refinement prec ppf = function
       Print.id x
       (pp_refinement Print.Prec.abs) f
   | RTemplate t -> pp_template ppf t
+  | _ -> assert false
 
 let rec pp_rtype prec ppf = function
   | RBool r -> begin
@@ -186,20 +179,32 @@ let subst_ariths id rint l = match rint with
   | RArith a ->
     List.map (Trans.Subst.Arith.arith id a) l
 
-let subst_ls_ariths id rlist ls = match rlist with 
+let subst_ariths2 id rint l = match rint with 
+  | RId id' -> 
+    List.map (Trans.Subst.Arith.arith_lsexpr id (Arith.Var(id'))) l
+  | RArith a ->
+    List.map (Trans.Subst.Arith.arith_lsexpr id a) l
+
+let subst_lsexprs id rlist ls = match rlist with 
   | RLId id' -> 
-    List.map (Trans.Subst.Arith.ls_arith id (Arith.LVar(id'))) ls
-  | RLsArith a ->
-    List.map (Trans.Subst.Arith.ls_arith id a) ls
+    List.map (Trans.Subst.Arith.lsexpr_arith id (Arith.LVar(id'))) ls
+  | RLsExpr a ->
+    List.map (Trans.Subst.Arith.lsexpr_arith id a) ls
+
+let subst_lsexprs2 id rlist ls = match rlist with 
+  | RLId id' -> 
+    List.map (Trans.Subst.Arith.lsexpr id (Arith.LVar(id'))) ls
+  | RLsExpr a ->
+    List.map (Trans.Subst.Arith.lsexpr id a) ls
 
 let rec subst_refinement id (rprim:rprim) refinement = 
   match (rprim, refinement) with
-  | (RIntP(rint), RPred (p, l)) -> RPred(p, subst_ariths id rint l)
-  | (RListP(rlist), RLsPred (p, l)) -> RLsPred(p, subst_ls_ariths id rlist l)
+  | (RIntP(rint), RPred (p, a, l)) -> RPred(p, subst_ariths id rint a, subst_ariths2 id rint l)
+  | (RListP(rlist), RPred (p, a, l)) -> RPred(p, subst_lsexprs id rlist a, subst_lsexprs2 id rlist l)
   | (_, RAnd(x, y)) -> conjoin (subst_refinement id rprim x) (subst_refinement id rprim y)
   | (_, ROr(x, y)) -> ROr(subst_refinement id rprim x, subst_refinement id rprim y)
-  | (RIntP(rint), RTemplate(id', l, ls)) -> RTemplate(id', subst_ariths id rint l, ls)
-  | (RListP(rlist), RTemplate(id', l, ls)) -> RTemplate(id', l, subst_ls_ariths id rlist ls)
+  | (RIntP(rint), RTemplate(id', l, ls)) -> RTemplate(id', subst_ariths id rint l, subst_ariths2 id rint ls)
+  | (RListP(rlist), RTemplate(id', l, ls)) -> RTemplate(id', subst_lsexprs id rlist l, subst_lsexprs2 id rlist ls)
   | (_, x) -> x
 
 let rec subst id rprim = function
@@ -234,8 +239,7 @@ let rec negate_ref = function
   | ROr(x, y) -> RAnd(negate_ref x, negate_ref y)
   | RTrue -> RFalse
   | RFalse -> RTrue
-  | RPred(p, l) -> RPred(Formula.negate_pred p, l)
-  | RLsPred(p, l) -> RLsPred(Formula.negate_ls_pred p, l)
+  | RPred(p, a, l) -> RPred(Formula.negate_pred p, a, l)
 
 let rec dual = function
   | RTemplate x -> RTemplate x
@@ -243,8 +247,7 @@ let rec dual = function
   | ROr(x, y) -> RAnd(dual x, dual y)
   | RTrue -> RFalse
   | RFalse -> RTrue
-  | RPred(p, l) -> RPred(Formula.negate_pred p, l)
-  | RLsPred(p, l) -> RLsPred(Formula.negate_ls_pred p, l)
+  | RPred(p, a, l) -> RPred(Formula.negate_pred p, a, l)
 
 (* This is an adhoc optimization of formulas. The reason why this function is required is
 that consider following program and its safety property problem.
@@ -306,7 +309,7 @@ let rec get_top = function
   | _ -> failwith "program error" (* should not occur int *)
 
 let rec simplify x = match x with
-  | RPred(p, l) -> begin match Formula.simplify_pred p l with 
+  | RPred(p, l, _) -> begin match Formula.simplify_pred p l with 
     | Some(true) -> RTrue
     | Some(false) -> RFalse
     | None -> x

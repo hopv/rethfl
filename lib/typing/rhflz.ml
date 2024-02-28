@@ -14,9 +14,8 @@ type t =
   | Forall of Rtype.t Id.t * t * template
   (* constructers only for hflz *)
   | Arith  of Arith.t
-  | LsArith of Arith.lt
-  | Pred   of Formula.pred * Arith.t list
-  | LsPred of Formula.ls_pred * Arith.lt list
+  | LsExpr of Arith.lt
+  | Pred of Formula.pred * Arith.t list * Arith.lt list
 
 let rec print_formula = function
   | Bool x when x -> Printf.printf "tt"
@@ -61,39 +60,35 @@ let rec print_formula = function
   | Arith x ->
     Print.arith Fmt.stdout x;
     Fmt.flush Fmt.stdout () 
-  | LsArith x ->
-    Print.ls_arith Fmt.stdout x;
+  | LsExpr x ->
+    Print.lsexpr Fmt.stdout x;
     Fmt.flush Fmt.stdout () 
-  | Pred (x,[f1; f2]) -> 
+  | Pred (x,[f1; f2], []) -> 
     Print.arith Fmt.stdout f1;
     Print.pred Fmt.stdout x;
     Print.arith Fmt.stdout f2;
     Fmt.flush Fmt.stdout () ;
-  | LsPred (x,[f1; f2]) -> 
-    Print.ls_arith Fmt.stdout f1;
-    Print.ls_pred Fmt.stdout x;
-    Print.ls_arith Fmt.stdout f2;
+  | Pred (x, [], [f1; f2]) -> 
+    Print.lsexpr Fmt.stdout f1;
+    Print.pred Fmt.stdout x;
+    Print.lsexpr Fmt.stdout f2;
     Fmt.flush Fmt.stdout () ;
-  | Pred (x,_) -> 
+  | Pred (x,_,_) -> 
     Print.pred Fmt.stdout x;
     Fmt.flush Fmt.stdout ()
-  | LsPred (x,_) -> 
-    Print.ls_pred Fmt.stdout x;
-    Fmt.flush Fmt.stdout () 
 
 let rec is_simple p = match p with
   | And(x, y, _, _) | Or(x, y, _, _) -> (is_simple x && is_simple y)
-  | Arith(_) | LsArith(_)| Var(_) | App(_) | Abs(_) | Forall(_) -> false
+  | Arith(_) | LsExpr(_)| Var(_) | App(_) | Abs(_) | Forall(_) -> false
   | _ -> true
 
 exception TriedToNegateApp
 let rec negate p = match p with
-  | Arith(_) | LsArith(_) | Var(_) | App(_) | Abs(_) | Forall(_) -> raise TriedToNegateApp
+  | Arith(_) | LsExpr(_) | Var(_) | App(_) | Abs(_) | Forall(_) -> raise TriedToNegateApp
   | Or(x, y, t1, t2) -> And(negate x, negate y, t1, t2)
   | And(x, y, t1, t2) -> Or(negate x, negate y, t1, t2)
   | Bool x -> Bool (not x)
-  | Pred(p, l) -> Pred(Formula.negate_pred p, l)
-  | LsPred(p, l) -> LsPred(Formula.negate_ls_pred p, l)
+  | Pred(p, a, l) -> Pred(Formula.negate_pred p, a, l)
 let rec translate_if hflz = match hflz with
   | Or(And(a, b, s1, s2), And(a', b', s1',s2'), t1, t2) ->
     let fa = is_simple a in
@@ -139,7 +134,7 @@ let rec bottom_hflz = function
   | Rtype.RInt(RId(x)) -> Var({x with ty=Rtype.(RInt(RId(x)))})
   | Rtype.RList(RLId(x)) -> Var({x with ty=Rtype.(RList(RLId(x)))})
   | Rtype.RInt(RArith(x)) -> Arith(x)
-  | Rtype.RList(RLsArith(x)) -> LsArith(x)
+  | Rtype.RList(RLsExpr(x)) -> LsExpr(x)
 
 let rec top_hflz = function
   | Rtype.RBool _ -> Bool(true)
@@ -148,4 +143,4 @@ let rec top_hflz = function
   | Rtype.RInt(RId(x)) -> Var({x with ty=Rtype.(RInt(RId(x)))})
   | Rtype.RInt(RArith(x)) -> Arith(x)
   | Rtype.RList(RLId(x)) -> Var({x with ty=Rtype.(RList(RLId(x)))})
-  | Rtype.RList(RLsArith(x)) -> LsArith(x)
+  | Rtype.RList(RLsExpr(x)) -> LsExpr(x)

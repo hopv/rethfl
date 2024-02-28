@@ -86,11 +86,16 @@ end = struct
             | I.T_PERCENT   -> "PERCENT"
             | I.T_NIL       -> "NIL"
             | I.T_CONS       -> "CONS"
+            | I.T_SIZE       -> "SIZE"
+            | I.T_HEAD       -> "HEAD"
+            | I.T_TAIL       -> "TAIL"
             end
         | I.X (I.N x) -> print @@ begin match x with
             | I.N_uvar                     -> "uvar"
             | I.N_pred_expr                -> "pred_expr"
             | I.N_pred                     -> "pred"
+            | I.N_ls_expr                  -> "lsexpr"
+            | I.N_ls_pred                  -> "ls_pred"
             | I.N_nonempty_list_hflz_rule_ -> "nonempty_list_hflz_rule_"
             | I.N_lvar                     -> "lvar"
             | I.N_list_lvar_               -> "list_lvar_"

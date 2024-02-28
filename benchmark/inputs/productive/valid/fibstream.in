@@ -1,0 +1,7 @@
+%HES
+Sentry =v ∀n.∀ls. n < (size ls) \/ Fib ls A n.
+A n =v true.
+Fib ls k u =v u > 0 /\ (ls <>l [] \/ k 0) /\ (ls <>l (0 ::[]) \/ k 1) /\
+  ∀hd1.∀hd2.∀tl.(ls <>l (hd1 :: (hd2 :: ls)) \/ Add Fib (\ls. Fib (0 :: ls)) tl k (u - 1)).
+Add f g ls k u =v u > 0 /\ (ls <>l [] \/ f [] (\r. g [] (\s. k (r + s)) u) u) /\ 
+  ∀hd.∀tl.(ls <>l (hd::tl) \/ Add (\ls. f (0 :: ls)) (\ls. g (0 :: ls)) tl k u).

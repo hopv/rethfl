@@ -16,6 +16,8 @@ let simplify_body acc args body =
   let rec pargs args = match args with
     | (List [Atom v; Atom "Int" ])::args ->
       (List [Atom "declare-const"; Atom v; Atom "Int"])::(pargs args)
+    | (List [Atom v; List[ Atom "List"; Atom "Int"]])::args ->
+      (List [Atom "declare-const"; Atom v; List[ Atom "List"; Atom "Int"]])::(pargs args)
     | [] -> []
     | _ -> fail "pargs" (List args)
   in
@@ -58,6 +60,11 @@ let simplify_model model =
   let open Sexp in
   let simplify_function_definition defs s = match s with
     | List [Atom "define-fun"; Atom id; List args; Atom "Bool"; body] ->
+        let args = List.map ~f:begin fun sexp ->
+          match sexp with
+          | List [Atom v; Atom "List"] -> List [Atom v; List [Atom "List"; Atom "Int"]]
+          | x -> x
+          end args in
         let body = simplify_body defs args body in
         List [Atom "define-fun"; Atom id; List args; Atom "Bool"; body]
     | s -> fail "parse_def" s

@@ -20,7 +20,7 @@ let rec find_and_cut_substs rt ids = match rt with
     (RAnd(x', y'), ids'')
   | ROr(x, y) -> 
     (ROr(x, y), ids)
-  | RPred(Formula.Eq, [Arith.Var(x); y]) ->
+  | RPred(Formula.Eq, [Arith.Var(x); y], []) ->
     (RTrue, (x, RArith(y)) :: ids)
   | x -> (x, ids)
 
@@ -140,7 +140,7 @@ let normalize chcs =
       Arith.Var(n) :: l, ret 
     | x::xs ->
       let new_id = Id.gen ~name:"tmp" `Int in
-      let accum' = conjoin accum (RPred(Formula.Eq, [Arith.Var(new_id); x])) in
+      let accum' = conjoin accum (RPred(Formula.Eq, [Arith.Var(new_id); x],[])) in
       let (l, ret) = rename xs current_vars accum' in
       Arith.Var(new_id) :: l, ret
   in

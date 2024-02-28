@@ -8,12 +8,10 @@ type pred =
   | Ge
   | Lt
   | Gt
-  [@@deriving eq,ord,show,iter,map,fold,sexp]
-
-type ls_pred =
   | Eql
   | Neql
   [@@deriving eq,ord,show,iter,map,fold,sexp]
+
 
 (* formula parametrized by variable type and arith type *)
 type ('bvar, 'avar, 'lvar) gen_t =
@@ -21,8 +19,7 @@ type ('bvar, 'avar, 'lvar) gen_t =
   | Var  of 'bvar
   | Or   of ('bvar, 'avar, 'lvar) gen_t list
   | And  of ('bvar, 'avar, 'lvar) gen_t list
-  | Pred of pred * 'avar Arith.gen_t list
-  | LsPred of ls_pred * ('avar, 'lvar) Arith.gen_lt list
+  | Pred of pred * ('avar, 'lvar) Arith.gen_t list * ('avar, 'lvar) Arith.gen_lt list
   [@@deriving eq,ord,show,iter,map,fold,sexp]
 
 let negate_pred = function
@@ -32,9 +29,7 @@ let negate_pred = function
   | Gt  -> Le
   | Lt  -> Ge
   | Ge  -> Lt
-
-let negate_ls_pred = function
-  | Eql  -> Neql
+  | Eql -> Neql
   | Neql -> Eql
 
 (* type t = ((string * [`Pos|`Neg]), [`Int] Id.t) gen_t *)
@@ -60,16 +55,15 @@ let mk_ors = function
   | [x] -> x
   | x::xs -> List.fold_left xs ~init:x ~f:mk_or
 
-let mk_pred pred as' = Pred (pred, as')
-let mk_lspred pred as' = LsPred (pred, as')
+let mk_pred pred as' = Pred (pred, as', [])
+let mk_lspred pred ls' = Pred (pred, [], ls')
 
 let rec mk_not' (negate_var : 'bvar -> 'bvar) = function
   | Var x  -> Var (negate_var x)
   | Bool b -> Bool (not b)
   | Or  fs -> And (List.map fs ~f:(mk_not' negate_var))
   | And fs -> Or  (List.map fs ~f:(mk_not' negate_var))
-  | Pred(pred, as') -> Pred(negate_pred pred, as')
-  | LsPred(ls_pred, as') -> LsPred(negate_ls_pred ls_pred, as')
+  | Pred(ls_pred, as', ls') -> Pred(negate_pred ls_pred, as', ls')
 let mk_not f = mk_not' Void.absurd f
 
 let mk_implies a b = mk_or (mk_not a) b
@@ -92,13 +86,10 @@ let rec fvs : ('bvar, 'avar, 'lvar) gen_t -> 'bvar list * 'avar list * 'lvar lis
   function
     | Bool _ -> [], [], []
     | Var x  -> [x], [], []
-    | Pred (_, as') -> [], List.concat_map as' ~f:Arith.fvs, []
-    | LsPred (_, as') ->
-        let ls = List.map as' ~f:Arith.lfvs in
-        let f = fun (afvs1, lfvs1) -> fun (afvs2, lfvs2) -> 
-          (List.append afvs1 afvs2, List.append lfvs1 lfvs2) in
-        let (afvs, lfvs) = List.fold ls ~init:([], []) ~f:f in
-        [], afvs, lfvs
+    | Pred (_, as', ls') ->
+        let (afvs1, lfvs1) = Arith.fvs_of_ariths as' in
+        let (afvs2, lfvs2) = Arith.fvs_of_lists ls' in
+        ([], List.append afvs1 afvs2, List.append lfvs1 lfvs2)
     | Or fs' | And fs' ->
         let vss, avss, lvss = List.unzip3 @@ List.map fs' ~f:fvs in
         List.concat vss, List.concat avss, List.concat lvss
@@ -116,4 +107,5 @@ let simplify_pred p args =
   | Ge, [x; y] -> lift (>=) x y
   | Lt, [x; y] -> lift (<) x y
   | Gt, [x; y] -> lift (>) x y
+  | Eql, _ | Neql, _ -> None
   | _ -> failwith "simplify pred"

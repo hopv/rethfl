@@ -1,3 +1,4 @@
 %HES
-S =v S2 (1::(2::[])) (1::(3::[])).
-S2 x y =v ∀hd1. ∀tl1. ∀hd2. ∀tl2.(x <>l (hd1 :: tl1) \/ y <>l (hd2 :: tl2) \/ ((S2 tl1 tl2) /\ hd1 = hd2)).
+S =v A [] 0.
+A ls n =v L ls n /\ A (0 :: ls) (n + 1).
+L ls n =v (ls <>l [] \/ n = 0) /\ ∀hd. ∀tl. (ls <>l (hd :: tl) \/ L tl (n - 1)).

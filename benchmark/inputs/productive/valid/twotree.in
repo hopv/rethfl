@@ -1,0 +1,12 @@
+%HES
+S =v ∀n.∀ls. n < (size ls) \/ G ls A n.
+A n =v true.
+G ls k u =v u > 0 /\ ∀hd.∀tl.((ls <>l [] \/ k 1) /\
+(ls <>l (hd :: tl) \/
+  (hd <> 0 \/ G tl A (u - 1)) /\
+  (hd <> 1 \/ G tl A (u - 1)))).
+Add f g ls k u =v u > 0 /\ (ls <>l [] \/ f [] (\r. g [] (\s. k (r + s)) u) u) /\ 
+  ∀hd.∀tl.(ls <>l (hd::tl) \/ 
+    (hd <> 0 \/ Add (\ls. f (0 :: ls)) (\ls. g (0 :: ls)) tl k u) /\
+    (hd <> 1 \/ Add (\ls. f (1 :: ls)) (\ls. g (1 :: ls)) tl k u)
+).

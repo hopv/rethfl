@@ -22,6 +22,7 @@ open Raw_hflz
 %token EQ "=" NEQ "<>" LE "<=" GE ">=" /* LT "<" GT ">" */
 %token AND "&&" OR "||"
 %token NIL "[]" CONS "::" EQL "=l" NEQL "<>l"
+%token SIZE "size" HEAD "head" TAIL "tail"
 
 %token TBOOL TINT TARROW "->" SEMICOLON ";"
 
@@ -84,6 +85,9 @@ arith_expr:
 | "-" arith_expr %prec NEG   { mk_op Arith.Sub [mk_int 0;$2] }
 
 app_expr:
+| "size" atom { mk_size $2}
+| "head" atom { mk_head $2}
+| "tail" atom { mk_tail $2}
 | atom atom* { mk_apps $1 $2 }
 
 atom:
@@ -131,19 +135,19 @@ and_or_predicate:
 a_predicate:
 | atom_predicate { $1 }
 | arith pred arith { Formula.mk_pred $2 [$1;$3] }
-| ls_arith ls_pred ls_arith { Formula.mk_lspred $2 [$1;$3] }
+| ls_expr ls_pred ls_expr { Formula.mk_lspred $2 [$1;$3] }
 
 arith:
 | atom_arith          { $1                                  }
 | arith op arith      { Arith.mk_op $2  [$1;$3]             }
 | "-" arith %prec NEG { Arith.mk_op Sub Arith.[mk_int 0;$2] }
 
-ls_arith:
-| "[]"                { Arith.mk_nil                        }
-| arith "::" ls_arith { Arith.mk_cons $1 $3                 }
-| lvar                { let x = Id.{ name=$1; ty=`List; id=(-1) } in
+ls_expr:
+| "[]"               { Arith.mk_nil                        }
+| arith "::" ls_expr { Arith.mk_cons $1 $3                 }
+| lvar               { let x = Id.{ name=$1; ty=`List; id=(-1) } in
                         Arith.mk_lvar x
-                      }
+                     }
 
 atom_arith:
 | "(" arith ")" { $2                                          }

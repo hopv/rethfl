@@ -22,32 +22,31 @@ module Subst = struct
         | Int _ -> a
         | Var v ->
             begin match IdMap.find env v with
-            | None -> a
-            | Some v' -> Var v'
+            | Some ({name=name;ty=`Int;id=id} as v') -> Var v'
+            | _ -> a
             end
         | Op(op, as') -> Op(op, List.map ~f:(arith env) as')
-
-    let rec ls_arith : 'a S.Id.t env -> S.Arith.lt -> S.Arith.lt =
+        | Size (size, ls) -> Size (size, lsexpr env ls)
+    and lsexpr : 'a S.Id.t env -> S.Arith.lt -> S.Arith.lt =
       fun env a ->
         match a with
-        | Nil -> a
         | LVar v ->
             begin match IdMap.find env v with
-            | None -> a
-            | Some v' -> LVar v'
+            | Some ({name=name;ty=`List;id=id} as v') -> LVar v'
+            | _ -> a
             end
-        | Cons(hd, tl) -> Cons(hd ,ls_arith env tl)
+        | Opl(opl,as', ls') -> Opl(opl, List.map ~f:(arith env) as' ,List.map ~f:(lsexpr env) ls')
 
-    let rec formula : [`Int ] S.Id.t IdMap.t -> S.Formula.t -> S.Formula.t =
+    let rec formula : 'a S.Id.t IdMap.t -> S.Formula.t -> S.Formula.t =
       fun env p ->
         match p with
-        | Pred(prim, as') -> Pred(prim, List.map as' ~f:(arith env))
+        | Pred(prim, as', ls') -> Pred(prim, List.map as' ~f:(arith env), List.map ls' ~f:(lsexpr env))
         | And ps -> And(List.map ~f:(formula env) ps)
         | Or  ps -> Or (List.map ~f:(formula env) ps)
         | _ -> p
 
     let rec abstraction_ty
-              : [`Int ] S.Id.t env
+              : [`Int | `List] S.Id.t env
              -> abstraction_ty
              -> abstraction_ty =
       fun env ty -> match ty with
@@ -62,20 +61,27 @@ module Subst = struct
   (* TODO IdMapを使う *)
   module Arith = struct
     let rec arith_
-              : ('var -> 'var -> bool)
-             -> 'var
-             -> 'var S.Arith.gen_t
-             -> 'var S.Arith.gen_t
-             -> 'var S.Arith.gen_t =
+              : ('avar -> 'avar -> bool)
+             -> 'avar
+             -> ('avar, 'lvar) S.Arith.gen_t
+             -> ('avar, 'lvar) S.Arith.gen_t
+             -> ('avar, 'lvar) S.Arith.gen_t =
       fun equal x a a' ->
         match a' with
         | Int _ -> a'
         | Var x' -> if equal x x' then a else a'
         | Op(op, as') -> Op(op, List.map ~f:(arith_ equal x a) as')
+        | Size (size, ls) -> Size (size, arith_lsexpr_ equal x a ls)
+    and arith_lsexpr_ equal x a l = match l with
+        | Opl (opl, as', ls') ->
+          Opl (opl,  List.map ~f:(arith_ equal x a) as', List.map ~f:(arith_lsexpr_ equal x a) ls')
+        | _ -> l
     let arith : 'a. 'a S.Id.t -> S.Arith.t -> S.Arith.t -> S.Arith.t =
       fun x a a' -> arith_ S.Id.eq {x with ty=`Int} a a'
+    let arith_lsexpr : 'a. 'a S.Id.t -> S.Arith.t -> S.Arith.lt -> S.Arith.lt =
+      fun x a a' -> arith_lsexpr_ S.Id.eq {x with ty=`Int} a a'
 
-    let rec ls_arith_
+    let rec lsexpr_
               : ('lvar -> 'lvar -> bool)
              -> 'lvar
              -> ('avar, 'lvar) S.Arith.gen_lt
@@ -83,21 +89,28 @@ module Subst = struct
              -> ('avar, 'lvar) S.Arith.gen_lt =
       fun equal x a a' ->
         match a' with
-        | Nil -> a'
         | LVar x' -> if equal x x' then a else a'
-        | Cons(hd, tl) -> Cons(hd, ls_arith_ equal x a tl)
-    let ls_arith : 'a. 'a S.Id.t -> S.Arith.lt -> S.Arith.lt -> S.Arith.lt =
-      fun x a a' -> ls_arith_ S.Id.eq {x with ty=`List} a a'
+        | Opl (opl, as', ls') -> 
+          Opl (opl, List.map ~f:(lsexpr_arith_ equal x a) as', List.map ~f:(lsexpr_ equal x a) ls')
+    and lsexpr_arith_ equal x a a' = match a' with
+        | Arith.Int _ -> a'
+        | Var _ -> a'
+        | Op(op, as') -> Op(op, List.map ~f:(lsexpr_arith_ equal x a) as')
+        | Size (size, ls) -> Size (size, lsexpr_ equal x a ls)
+    let lsexpr : 'a. 'a S.Id.t -> S.Arith.lt -> S.Arith.lt -> S.Arith.lt =
+      fun x a a' -> lsexpr_ S.Id.eq {x with ty=`List} a a'
+    let lsexpr_arith : 'a. 'a S.Id.t -> S.Arith.lt -> S.Arith.t -> S.Arith.t =
+      fun x a a' -> lsexpr_arith_ S.Id.eq {x with ty=`List} a a'
 
     let rec formula_
-              : ('var -> 'var -> bool)
-             -> 'var
-             -> 'var S.Arith.gen_t
-             -> ('bvar,'var, _) S.Formula.gen_t
-             -> ('bvar,'var, _) S.Formula.gen_t =
+              : ('avar -> 'avar -> bool)
+             -> 'avar
+             -> ('avar,'lvar) S.Arith.gen_t
+             -> ('bvar,'var,'lvar) S.Formula.gen_t
+             -> ('bvar,'var,'lvar) S.Formula.gen_t =
       fun equal x a p ->
         match p with
-        | Pred(prim, as') -> Pred(prim, List.map as' ~f:(arith_ equal x a))
+        | Pred(prim, as', ls') -> Pred(prim, List.map as' ~f:(arith_ equal x a), ls') (*TODO*)
         | And ps -> And(List.map ~f:(formula_ equal x a) ps)
         | Or  ps -> Or (List.map ~f:(formula_ equal x a) ps)
         | _ -> p
@@ -152,16 +165,16 @@ module Subst = struct
             | _ -> assert false
             end
         | Op(op, as') -> Op(op, List.map ~f:(arith env) as')
-    let rec ls_arith : 'ty S.Hflz.t env -> S.Arith.lt -> S.Arith.lt =
+        | Size (size, ls) -> Size (size, lsexpr env ls)
+    and lsexpr : 'ty S.Hflz.t env -> S.Arith.lt -> S.Arith.lt =
       fun env a -> match a with
-        | Nil -> a
         | LVar x ->
             begin match IdMap.find env x with
             | None -> a
-            | Some (LsArith a') -> a'
+            | Some (LsExpr a') -> a'
             | _ -> assert false
             end
-        | Cons(hd, tl) -> Cons(arith env hd, ls_arith env tl)
+        | Opl(opl, as', ls') -> Opl(opl, List.map ~f:(arith env) as', List.map ~f:(lsexpr env) ls')
     let rec rename_bindings (phi : 'ty S.Hflz.t): 'ty S.Hflz.t =
       let rec go rename (phi : 'ty S.Hflz.t): 'ty S.Hflz.t = match phi with
         | Var x -> begin
@@ -188,24 +201,15 @@ module Subst = struct
           let x = { x_ with id = S.Id.gen_id () } in
           Forall (x, go (IdMap.add rename x_ x) t)
         | Bool b -> Bool b
-        | Arith _ | Pred _ ->
+        | Arith _ | Pred _ | LsExpr _->
           let rename =
             IdMap.filter_map
               rename
               ~f:(fun a ->
                 match a.S.Id.ty with
                 | TyInt -> Some (S.Hflz.Arith (S.Arith.Var ({a with ty=`Int})))
+                | TyList -> Some (S.Hflz.LsExpr (S.Arith.LVar ({a with ty=`List})))
                 |  _ -> None
-              ) in
-          hflz rename phi
-        | LsArith _ | LsPred _ ->
-          let rename =
-            IdMap.filter_map
-              rename
-              ~f:(fun a ->
-                match a.S.Id.ty with
-                | TyList -> Some (S.Hflz.LsArith (S.Arith.LVar ({a with ty=`List})))
-                | _ -> None
               ) in
           hflz rename phi in
       go IdMap.empty phi
@@ -229,12 +233,10 @@ module Subst = struct
             Forall(x, hflz_ (IdMap.remove s_env x) (IdSet.add b_env x) t)
           | Arith a        ->
             Arith (arith s_env a)
-          | LsArith a        ->
-            LsArith (ls_arith s_env a)
-          | Pred (p,as')   ->
-            Pred(p, List.map ~f:(arith s_env) as')
-          | LsPred (p,as')   ->
-            LsPred(p, List.map ~f:(ls_arith s_env) as')
+          | LsExpr a        ->
+            LsExpr (lsexpr s_env a)
+          | Pred (p,as',ls')   ->
+            Pred(p, List.map ~f:(arith s_env) as', List.map ~f:(lsexpr s_env) ls')
           | Bool _         -> phi
         in
         hflz_ env_ IdSet.empty phi

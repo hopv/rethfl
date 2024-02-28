@@ -1,0 +1,7 @@
+%HES
+Sentry =v ∀n.∀ls. n < (size ls) \/ P ls A (4 * n).
+A n =v true.
+T ls k u =v u > 0 /\ (ls <>l [] \/ k 0) /\ (ls <>l (0 ::[]) \/ k 1) /\
+  ∀hd1.∀hd2.∀tl. (ls <>l (hd1 :: (hd2 :: tl)) \/ T tl k (u - 1)).
+I f g ls k u =v u > 0 /\ (ls <>l [] \/ f [] k u) /\ ∀hd.∀tl. (ls <>l (hd :: tl) \/ I g (\ls. f (0 :: ls)) tl k (u - 1)).
+P ls k u =v I T P ls k u.

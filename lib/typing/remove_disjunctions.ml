@@ -15,6 +15,7 @@ let as_var v = {v with Id.ty=Type.TyBool ()}
 let rec convert_argty argty =
   match argty with
   | Type.TyInt -> Type.TyInt
+  | Type.TyList -> Type.TyList
   | Type.TySigma ty -> Type.TySigma (convert_ty ty)
 and convert_ty ty =
   match ty with
@@ -31,9 +32,9 @@ let convert_formula env phi =
     | Bool false ->
       let id = id_gen () in
       Abs (id, Var (as_var id))
-    | Pred (op, as') ->
+    | Pred (op, as',ls') ->
       let id = id_gen () in
-      Abs (id, Or (Pred (op, as'), Var (as_var id)))
+      Abs (id, Or (Pred (op, as', ls'), Var (as_var id)))
     | Or (p1, p2) ->
       let id = id_gen () in
       Abs (id, App (go env p1, App (go env p2, Var (as_var id))))
@@ -51,13 +52,15 @@ let convert_formula env phi =
       )
     | App (p1, Arith e) ->
       App (go env p1, Arith e)
+    | App (p1, LsExpr e) ->
+      App (go env p1, LsExpr e)
     | App (p1, p2) ->
       App (go env p1, go env p2)
     | Abs _ -> begin
       let rec g env p2 = match p2 with
         | Abs (x, p2') ->
           let x = {x with ty=convert_argty x.ty} in
-          let env = match x.ty with | TyInt -> env | TySigma ty -> ({x with ty}::env) in
+          let env = match x.ty with | TyInt -> env | TyList -> env | TySigma ty -> ({x with ty}::env) in
           Abs (x, g env p2')
         | _ ->
           let id = id_gen () in
@@ -70,7 +73,7 @@ let convert_formula env phi =
       | [x'] -> Var x'
       | _ -> assert false
     end
-    | Arith _ -> assert false
+    | Arith _ | LsExpr _ -> assert false
   in
   go env phi    
 

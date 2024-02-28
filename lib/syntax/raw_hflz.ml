@@ -7,11 +7,10 @@ type raw_hflz =
   | Abs  of string * raw_hflz
   | App  of raw_hflz * raw_hflz
   | Int  of int
-  | Nil
-  | Cons of raw_hflz * raw_hflz
   | Op   of Arith.op * raw_hflz list
-  | Pred of Formula.pred * raw_hflz list
-  | LsPred of Formula.ls_pred * raw_hflz list
+  | Opl  of Arith.opl * raw_hflz list * raw_hflz list
+  | Size of Arith.size * raw_hflz
+  | Pred of Formula.pred * raw_hflz list * raw_hflz list
   | Forall of string * raw_hflz
   [@@deriving eq,ord,show,iter,map,fold,sexp]
 type hes_rule =
@@ -25,8 +24,11 @@ type hes = hes_rule list
   [@@deriving eq,ord,show,iter,map,fold,sexp]
 
 let mk_int n     = Int(n)
-let mk_nil = Nil
-let mk_cons hd tl = Cons (hd, tl)
+let mk_nil = Opl(Nil, [], [])
+let mk_cons hd tl = Opl (Cons, [hd], [tl])
+let mk_head ls = Size (Head, ls)
+let mk_tail ls = Opl (Tail, [], [ls])
+let mk_size ls = Size (Length, ls)
 let mk_bool b    = Bool b
 let mk_var x     = Var x
 let mk_op op as' = Op(op,as')
@@ -40,8 +42,9 @@ let mk_ors = function
   | [] -> Bool false
   | x::xs -> List.fold_left xs ~init:x ~f:(fun a b -> Or(a,b))
 
-let mk_pred pred a1 a2 = Pred(pred, [a1;a2])
-let mk_lspred pred a1 a2 = LsPred(pred, [a1;a2])
+let mk_pred pred a1 a2 = Pred(pred, [a1;a2], [])
+let mk_lspred pred a1 a2 = Pred(pred, [], [a1;a2])
+
 let mk_app t1 t2 = App(t1,t2)
 let mk_apps t ts = List.fold_left ts ~init:t ~f:mk_app
 
@@ -221,12 +224,12 @@ module Typing = struct
             in
             self#add_ty_env x TvInt; Arith.mk_var x
         | Op (op, as') -> Op (op, List.map ~f:(self#arith id_env) as')
+        | Size (size, ls) -> Size (size, self#lsexpr id_env ls)
         | _ -> failwith "annot.arith"
 
-    method ls_arith : id_env -> raw_hflz -> Arith.lt =
+    method lsexpr : id_env -> raw_hflz -> Arith.lt =
       fun id_env ls -> match ls with
-        | Nil -> Arith.mk_nil
-        | Cons (hd, tl) -> Arith.mk_cons (self#arith id_env hd) (self#ls_arith id_env tl)
+        | Opl (opl, as', ls') -> Opl(opl, List.map ~f:(self#arith id_env) as', List.map ~f:(self#lsexpr id_env) ls')
         | Var name ->
             let x =
               match
@@ -241,7 +244,7 @@ module Typing = struct
                   Id.{ name; id; ty=`List }
             in
             self#add_ty_env x TvList; Arith.mk_lvar x
-        | _ -> failwith "annot.ls_arith"
+        | _ -> failwith "annot.lsexpr"
 
     method term : id_env -> raw_hflz -> tyvar -> unit Hflz.t =
       fun id_env psi tv ->
@@ -282,18 +285,15 @@ module Typing = struct
             let psi2 = self#term id_env psi2 TvBool in
             unify tv TvBool;
             And (psi1,psi2)
-        | Pred (pred,as') ->
+        | Pred (pred,as',ls') ->
             unify tv TvBool;
-            Pred(pred, List.map ~f:(self#arith id_env) as')
-        | LsPred (pred,as') ->
-            unify tv TvBool;
-            LsPred(pred, List.map ~f:(self#ls_arith id_env) as')
-        | Int _ | Op _ ->
+            Pred(pred, List.map ~f:(self#arith id_env) as', List.map ~f:(self#lsexpr id_env) ls')
+        | Int _ | Op _ | Size _->
             unify tv TvInt;
             Arith (self#arith id_env psi)
-        | Nil | Cons _ ->
+        | Opl _ ->
             unify tv TvList;
-            LsArith (self#ls_arith id_env psi)
+            LsExpr (self#lsexpr id_env psi)
         | Abs(name, psi) ->
             let id = new_id() in
             let x = Id.{ name; id; ty = () } in
@@ -410,7 +410,7 @@ module Typing = struct
           begin match self#id x with
           | x -> Var x
           | exception IntType -> Arith (Arith.mk_var x)
-          | exception ListType -> LsArith (Arith.mk_lvar x)
+          | exception ListType -> LsExpr (Arith.mk_lvar x)
           end
       | Bool b           -> Bool b
       | Or  (psi1,psi2)  -> Or  (self#term psi1, self#term psi2)
@@ -419,9 +419,8 @@ module Typing = struct
       | Abs (x, psi)     -> Abs (self#arg_id x, self#term psi)
       | Forall(x, psi)   -> Forall (self#arg_id x, self#term psi)
       | Arith a          -> Arith a
-      | LsArith a        -> LsArith a
-      | Pred (pred,as')  -> Pred(pred, as')
-      | LsPred (pred,as')-> LsPred(pred, as')
+      | LsExpr a        -> LsExpr a
+      | Pred (pred,as',ls')-> Pred(pred, as',ls')
 
     method hes_rule : unit Hflz.hes_rule -> simple_ty Hflz.hes_rule =
       fun rule ->
@@ -476,7 +475,7 @@ let rename_simple_ty_rule
     { rule with var = { rule.var with ty = sty' } }
 
 let rec rename_abstraction_ty
-      : ?env:[`Int] Id.t IdMap.t
+      : ?env:[`Int | `List] Id.t IdMap.t
      -> simple_ty
      -> abstraction_ty
      -> abstraction_ty =
@@ -487,6 +486,10 @@ let rec rename_abstraction_ty
       TyArrow({ty=TyInt;_} as x', ret_aty) ->
         let env = IdMap.replace env x' {x with ty=`Int} in
         TyArrow({x with ty=TyInt}, rename_abstraction_ty ~env ret_sty ret_aty)
+    | TyArrow({ty=TyList;_} as x , ret_sty),
+      TyArrow({ty=TyList;_} as x', ret_aty) ->
+        let env = IdMap.replace env x' {x with ty=`List} in
+        TyArrow({x with ty=TyList}, rename_abstraction_ty ~env ret_sty ret_aty)
     | TyArrow({ty=TySigma arg_sty;_} as x , ret_sty),
       TyArrow({ty=TySigma arg_aty;_} as x', ret_aty) ->
         let ty = TySigma(rename_abstraction_ty ~env arg_sty arg_aty) in
@@ -504,9 +507,8 @@ let rename_ty_body : simple_ty Hflz.hes -> simple_ty Hflz.hes =
         | And (psi1, psi2) -> And (term env psi1, term env psi2)
         | App (psi1, psi2) -> App (term env psi1, term env psi2)
         | Arith a          -> Arith a
-        | LsArith a          -> LsArith a
-        | Pred (pred, as') -> Pred (pred, as')
-        | LsPred (pred, as') -> LsPred (pred, as')
+        | LsExpr a          -> LsExpr a
+        | Pred (pred, as', ls') -> Pred (pred, as', ls')
         | Abs ({ty=TySigma ty;_} as x, psi) ->
             Abs(x, term (IdMap.add env x ty) psi)
         | Abs (x, psi) -> Abs(x, term env psi)

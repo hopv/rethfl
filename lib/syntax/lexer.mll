@@ -32,6 +32,9 @@ rule token = parse
 | "::"                     { CONS      }
 | "=l"                     { EQL       }
 | "<>l"                    { NEQL      }
+| "size"                   { SIZE      }
+| "head"                   { HEAD      }
+| "tail"                   { TAIL      }
 | "true"                   { TRUE      }
 | "false"                  { FALSE     }
 | ("\\"|"λ")               { LAMBDA    }

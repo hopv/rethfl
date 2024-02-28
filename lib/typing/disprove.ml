@@ -53,7 +53,7 @@ let disprove unsat_proof hes env top =
       | Bool x -> VBool(Fpl.Bool(x))
       | Or(p, q, _, _) -> VBool(Fpl.Or(f_bool env p, f_bool env q))
       | And(p, q, _, _) -> VBool(Fpl.And(f_bool env p, f_bool env q))
-      | Pred(a, l) -> VBool(Fpl.Pred(a, List.map (f_arith env) l))
+      | Pred(a, l, _) -> VBool(Fpl.Pred(a, List.map (f_arith env) l))
       | Arith(a) -> VInt(f_arith env a)
       | Forall(id, e, _) -> 
         begin

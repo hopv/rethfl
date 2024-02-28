@@ -81,9 +81,10 @@ let void : Void.t t =
 let void_ : Void.t t_with_prec =
   ignore_prec void
 
-let id : 'ty Id.t t =
-  fun ppf x -> Fmt.pf ppf "%s" (Id.to_string x)
-let id_ : 'ty Id.t t_with_prec =
+let id ppf (x: 'ty Id.t) = Fmt.pf ppf "%s" (Id.to_string x)
+let id_ =
+  ignore_prec id
+let lid_ =
   ignore_prec id
 
 (* Arith *)
@@ -101,46 +102,63 @@ let op_ : Arith.op t_with_prec =
 let cons =
   fun ppf _ -> Fmt.string ppf "::"
 
-let rec gen_arith_ : 'avar t_with_prec -> 'avar Arith.gen_t t_with_prec =
-  fun avar_ prec ppf a -> match a with
+let tail =
+  fun ppf _ -> Fmt.string ppf "tail"
+
+let prim = function
+| Arith.Length -> fun ppf _ -> Fmt.string ppf "size"
+| Arith.Head -> fun ppf _ -> Fmt.string ppf "head"
+
+let rec gen_arith_ : 'avar t_with_prec ->  'lvar t_with_prec ->
+   ('avar, 'lvar) Arith.gen_t t_with_prec =
+  fun avar_ lvar_ prec ppf a -> match a with
     | Int n -> Fmt.int ppf n
     | Var x -> avar_ prec ppf x
     | Op (Sub,[Int 0;a]) ->
         show_paren (prec > Prec.neg) ppf "-%a"
-          (gen_arith_ avar_ Prec.(succ neg)) a
+          (gen_arith_ avar_ lvar_ Prec.(succ neg)) a
     | Op (op',[a1;a2]) ->
         let op_prec = Prec.of_op op' in
         let prec_l = Prec.(succ_if (not @@ op_is_leftassoc op') op_prec) in
         let prec_r = Prec.(succ_if (not @@ op_is_rightassoc op') op_prec) in
         show_paren (prec > op_prec) ppf "@[<1>%a@ %a@ %a@]"
-          (gen_arith_ avar_ prec_l) a1
+          (gen_arith_ avar_ lvar_ prec_l) a1
           op op'
-          (gen_arith_ avar_ prec_r) a2
+          (gen_arith_ avar_ lvar_ prec_r) a2
+    | Size (size, ls) ->
+      show_paren (prec > Prec.app) ppf "@[<1>%a@ %a@]"
+        (prim size)()
+        (gen_lsexpr_ avar_ lvar_ Prec.app) ls
     | _ -> assert false
-let gen_arith : 'avar t_with_prec -> 'avar Arith.gen_t t =
-  fun avar_ ppf a -> gen_arith_ avar_ Prec.zero ppf a
-let arith_ : Prec.t -> Arith.t Fmt.t =
-  fun prec ppf a -> gen_arith_ id_ prec ppf a
-let arith : Arith.t Fmt.t = arith_ Prec.zero
-
-
-let rec gen_ls_arith_ : 'var t_with_prec -> ('avar, 'lvar) Arith.gen_lt t_with_prec =
-  fun avar_ prec ppf a -> match a with
-    | Nil -> Fmt.string ppf "[]"
-    | LVar x -> Fmt.string ppf (Id.to_string x)
-    | Cons (hd, tl) ->
+and gen_lsexpr_ : 'avar t_with_prec -> 'lvar t_with_prec -> ('avar, 'lvar) Arith.gen_lt t_with_prec =
+  fun avar_ lvar_ prec ppf a -> match a with
+    | LVar x -> lvar_ prec ppf x
+    | Opl (Nil,_,_) -> Fmt.string ppf "[]"
+    | Opl (Tail, [], [ls]) -> 
+      show_paren (prec > Prec.app) ppf "@[<1>%a@ %a@]"
+        tail ()
+        (gen_lsexpr_ avar_ lvar_ Prec.app) ls
+    | Opl (Cons, [hd], [tl]) ->
       let op_prec = Prec.of_cons in
       let prec_l = op_prec in
       let prec_r = Prec.succ op_prec in
       show_paren (prec > op_prec) ppf "@[<1>%a@ %a@ %a@]"
-          (gen_arith_ avar_ prec_l) hd
+          (gen_arith_ avar_ lvar_ prec_l) hd
           cons ()
-          (gen_ls_arith_ avar_ prec_l) tl
-let gen_ls_arith : 'var t_with_prec -> ('avar, 'lvar) Arith.gen_lt t =
-  fun avar_ ppf a -> gen_ls_arith_ avar_ Prec.zero ppf a
-let ls_arith_ : Prec.t -> Arith.lt Fmt.t =
-  fun prec ppf a -> gen_ls_arith_ id_ prec ppf a
-let ls_arith : Arith.lt Fmt.t = ls_arith_ Prec.zero
+          (gen_lsexpr_ avar_ lvar_ prec_r) tl
+    | _ -> assert false
+let gen_arith : 'avar t_with_prec -> 'lvar t_with_prec -> ('avar, 'lvar) Arith.gen_t t =
+  fun avar_ lvar_ ppf a -> gen_arith_ avar_ lvar_ Prec.zero ppf a
+let arith_ : Prec.t -> Arith.t Fmt.t =
+  fun prec ppf a -> gen_arith_ id_ lid_ prec ppf a
+let arith : Arith.t Fmt.t = arith_ Prec.zero
+
+
+let gen_lsexpr : 'avar t_with_prec -> 'lvar t_with_prec -> ('avar, 'lvar) Arith.gen_lt t =
+  fun avar_ lvar_ ppf a -> gen_lsexpr_ avar_ lvar_ Prec.zero ppf a
+let lsexpr_ : Prec.t -> Arith.lt Fmt.t =
+  fun prec ppf a -> gen_lsexpr_ id_ lid_ prec ppf a
+let lsexpr : Arith.lt Fmt.t = lsexpr_ Prec.zero
 
 (* Formula *)
 
@@ -152,53 +170,48 @@ let pred : Formula.pred t =
     | Ge  -> Fmt.string ppf ">="
     | Lt  -> Fmt.string ppf "<"
     | Gt  -> Fmt.string ppf ">"
-let pred_ : Formula.pred t_with_prec =
-  ignore_prec pred
-
-let ls_pred : Formula.ls_pred t =
-  fun ppf pred -> match pred with
     | Eql  -> Fmt.string ppf "=l"
     | Neql -> Fmt.string ppf "/=l"
-
-let ls_pred_ : Formula.pred t_with_prec =
+let pred_ : Formula.pred t_with_prec =
   ignore_prec pred
 
 let rec gen_formula_
     :  'bvar t_with_prec
     -> 'avar t_with_prec
+    -> 'lvar t_with_prec
     -> ('bvar, 'avar, 'lvar) Formula.gen_t t_with_prec =
-  fun bvar avar prec ppf f -> match f with
+  fun bvar avar lvar prec ppf f -> match f with
     | Var x      -> bvar prec ppf x
     | Bool true  -> Fmt.string ppf "true"
     | Bool false -> Fmt.string ppf "false"
     | Or fs ->
         let sep ppf () = Fmt.pf ppf "@ || " in
         show_paren (prec > Prec.or_) ppf "@[<hv 0>%a@]"
-          (list ~sep (gen_formula_ bvar avar Prec.or_)) fs
+          (list ~sep (gen_formula_ bvar avar lvar Prec.or_)) fs
     | And fs ->
         let sep ppf () = Fmt.pf ppf "@ && " in
         show_paren (prec > Prec.and_) ppf "@[<hv 0>%a@]"
-          (list ~sep (gen_formula_ bvar avar Prec.and_)) fs
-    | Pred(pred',[f1;f2]) ->
+          (list ~sep (gen_formula_ bvar avar lvar Prec.and_)) fs
+    | Pred(pred',[f1;f2], []) ->
         Fmt.pf ppf "@[<1>%a@ %a@ %a@]"
-          (gen_arith_ avar prec) f1
+          (gen_arith_ avar lvar prec) f1
           pred pred'
-          (gen_arith_ avar prec) f2
-    | Pred _ -> assert false
-    | LsPred(pred', [f1;f2]) ->
+          (gen_arith_ avar lvar prec) f2
+    | Pred(pred', [], [f1;f2]) ->
         Fmt.pf ppf "@[<1>%a@ %a@ %a@]"
-          (gen_ls_arith_ avar prec) f1
-          ls_pred pred'
-          (gen_ls_arith_ avar prec) f2
+          (gen_lsexpr_ avar lvar prec) f1
+          pred pred'
+          (gen_lsexpr_ avar lvar prec) f2
     | _ -> assert false
 let gen_formula
     :  'bvar t_with_prec
     -> 'avar t_with_prec
+    -> 'lvar t_with_prec
     -> ('bvar, 'avar, 'lvar) Formula.gen_t t =
-  fun bvar avar ppf f ->
-    gen_formula_ bvar avar Prec.zero ppf f
+  fun bvar avar lvar ppf f ->
+    gen_formula_ bvar avar lvar Prec.zero ppf f
 let formula_ : Formula.t t_with_prec =
-  gen_formula_ void_ id_
+  gen_formula_ void_ id_ lid_
 let formula : Formula.t Fmt.t =
   formula_ Prec.zero
 
@@ -346,14 +359,11 @@ let rec hflz_ : (Prec.t -> 'ty Fmt.t) -> Prec.t -> 'ty Hflz.t Fmt.t =
           (hflz_ format_ty_ Prec.(succ app)) psi2
     | Arith a ->
         arith_ prec ppf a
-    | LsArith a ->
-        ls_arith_ prec ppf a
-    | Pred (pred, as') ->
+    | LsExpr a ->
+        lsexpr_ prec ppf a
+    | Pred (pred, as', ls') ->
         show_paren (prec > Prec.eq) ppf "%a"
-          formula (Formula.Pred(pred, as'))
-    | LsPred (pred, as') ->
-        show_paren (prec > Prec.eq) ppf "%a"
-          formula (Formula.LsPred(pred, as'))
+          formula (Formula.Pred(pred, as', ls'))
 
 let hflz : (Prec.t -> 'ty Fmt.t) -> 'ty Hflz.t Fmt.t =
   fun format_ty_ -> hflz_ format_ty_ Prec.zero
