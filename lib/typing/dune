@@ -1,6 +1,6 @@
 (library
  (name hflmc2_typing)
- (public_name hflmc3.typing)
+ (public_name rethfl.typing)
  (libraries
    core
    eldarica

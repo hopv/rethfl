@@ -6,7 +6,7 @@
 
 (library
  (name hflmc2_syntax)
- (public_name hflmc3.syntax)
+ (public_name rethfl.syntax)
  (libraries
    hflmc2_util
    hflmc2_options

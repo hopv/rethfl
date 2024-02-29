@@ -1,5 +1,5 @@
 (library
- (public_name hflmc3)
+ (public_name rethfl)
  (libraries
     eldarica
     hflmc2_util

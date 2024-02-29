@@ -49,7 +49,7 @@ let call_fptprove timeout file =
     | Not_found -> Filename.concat (Sys.getenv "HOME") "bitbucket.org/uhiro/fptprove"
   in
   Sys.chdir fptprove_path;
-  let _, out, _ = Fn.run_command ~timeout:timeout (Array.concat [[|"./script/hflmc3.sh"|]; [|file|]]) in
+  let _, out, _ = Fn.run_command ~timeout:timeout (Array.concat [[|"./script/rethfl.sh"|]; [|file|]]) in
   let l = String.split out ~on:',' in
   match List.nth l 1 with
     | Some(x) -> Some(x, "")

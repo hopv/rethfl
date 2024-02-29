@@ -1,6 +1,6 @@
 (library
  (name hflmc2_options)
- (public_name hflmc3.options)
+ (public_name rethfl.options)
  (libraries
    fmt
    fmt.cli

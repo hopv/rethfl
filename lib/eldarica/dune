@@ -6,7 +6,7 @@
 
  (library
  (name eldarica)
- (public_name hflmc3.eldarica)
+ (public_name rethfl.eldarica)
  (libraries
    menhirLib
  )

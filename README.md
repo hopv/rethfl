@@ -24,7 +24,7 @@ opam init
 After you've set up an opam swtich, running the following command will install rethfl:
 
 ``` shell
-opam pin add hflmc3 https://github.com/hopv/rethfl.git#master
+opam pin add rethfl https://github.com/hopv/rethfl.git#master
 ```
 
 ### Manual build
@@ -65,13 +65,13 @@ To summarize, here is the list of external dependencies
 ## How to Run
 
 ``` shell
-hflmc3 <filename>
+rethfl <filename>
 ```
 
-See `hflmc3 --help ` for more information.
+See `rethfl --help ` for more information.
 
 If you want to run a manually built executable, run the following command instead:
 
 ``` shell
-dune exec hflmc3 -- <filename>
+dune exec rethfl -- <filename>
 ```

@@ -1,6 +1,6 @@
 (lang dune 3.0)
 (using menhir 2.0)
-(name hflmc3)
+(name rethfl)
 (generate_opam_files)
 (version 0.1)
 (source (github hopv/rethfl))
@@ -9,7 +9,7 @@
 (maintainers "katsura@kb.is.s.u-tokyo.ac.jp")
 
 (package
-  (name hflmc3)
+  (name rethfl)
   (synopsis "A nuHFLZ solver based on refinement types")
   ; (description "A longer description")
   (depends

@@ -31,7 +31,7 @@ let report_times () =
         in Print.pr "%s %f sec@." s v
       end
 
-(* The above code should be merged in hflmc2.ml... *)
+(* The above code should be merged in rethfl.ml... *)
 
 let new_var () = RId(Id.gen `Int)
 let rec rty = function

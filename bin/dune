@@ -1,10 +1,10 @@
 (executables
  (names main)
  (modules main)
- (libraries hflmc3))
+ (libraries rethfl))
 (install
- (package hflmc3)
+ (package rethfl)
  (section bin)
- (files (main.exe as hflmc3)))
+ (files (main.exe as rethfl)))
 
 (env (dev (flags (:standard -warn-error -A))))

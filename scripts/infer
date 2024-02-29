@@ -6,4 +6,4 @@ ml2hfl $1 > $FILENAME
 
 shift
 
-hflmc3 $FILENAME $@
+rethfl $FILENAME $@

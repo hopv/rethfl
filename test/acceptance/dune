@@ -1,3 +1,3 @@
 (test
   (name acceptance)
-  (libraries core core_unix.sys_unix fmt hflmc3))
+  (libraries core core_unix.sys_unix fmt rethfl))

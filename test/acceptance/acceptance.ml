@@ -5,7 +5,7 @@ let args = [| "dummy_file"
             ; "--quiet"
             ; "--no-inlining"
             |]
-let _ = Hflmc3.Options.parse ~argv:(Array.append args (Sys.get_argv ())) ()
+let _ = Rethfl.Options.parse ~argv:(Array.append args (Sys.get_argv ())) ()
 
 (* TODO duneのrootを手に入れる方法はないものか．
  * Sys.getenv_exn "OWD" がそれっぽいけどドキュメントにはなってなさそう
@@ -21,7 +21,7 @@ let measure_time f =
 type test_sort =
   { name     : string
   ; dir      : string
-  ; succsess : Hflmc3.result
+  ; succsess : Rethfl.result
   }
 
 let check : test_sort -> bool =
@@ -37,7 +37,7 @@ let check : test_sort -> bool =
     List.iter files ~f:begin fun file ->
       let result, time =
         measure_time begin fun () ->
-          try Ok (Hflmc3.main (dir ^ "/" ^ file)) with e -> Error e
+          try Ok (Rethfl.main (dir ^ "/" ^ file)) with e -> Error e
         end
       in
       let path_to_show =
@@ -46,13 +46,13 @@ let check : test_sort -> bool =
       in
       match result with
       (* succsess *)
-      | Ok res when Hflmc3.equal_result res sort.succsess ->
+      | Ok res when Rethfl.equal_result res sort.succsess ->
           Fmt.pf Fmt.stdout "input/ok/%s %f sec@." path_to_show time
       (* failure *)
       | Ok res ->
           count := !count + 1;
           Fmt.pf Fmt.stderr "input/ok/%s %s@."
-            path_to_show (Hflmc3.show_result res)
+            path_to_show (Rethfl.show_result res)
       | Error e ->
           count := !count + 1;
           Fmt.pf Fmt.stdout "@[<2>input/ok/%s failed with error:@ %s@]@."
