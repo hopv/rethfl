@@ -1,5 +1,5 @@
 (* NOTE Information of type will be lost! *)
-open Hflmc2_util
+open Rethfl_util
 include Map.Make'(Id.Key)
 
 let singleton : 'a Id.t -> 'x -> 'x t =

@@ -4,7 +4,7 @@
  (libraries
    core
    eldarica
-   hflmc2_util
+   rethfl_util
    rethfl_options
    rethfl_syntax)
  (preprocess (pps ppx_deriving.std ppx_compare ppx_sexp_conv)))

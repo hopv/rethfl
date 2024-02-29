@@ -1,5 +1,5 @@
 open Core
-open Hflmc2_util
+open Rethfl_util
 
 let args = [| "dummy_file"
             ; "--quiet"

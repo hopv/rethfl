@@ -9,16 +9,16 @@ let measure_time f =
   let result = f () in
   let stop   = Unix.gettimeofday () in
   result, stop -. start
-let times = let open Hflmc2_util in Hashtbl.create (module String)
+let times = let open Rethfl_util in Hashtbl.create (module String)
 let add_mesure_time tag f =
-   let open Hflmc2_util in
+   let open Rethfl_util in
   let r, time = measure_time f in
   let if_found t = Hashtbl.set times ~key:tag ~data:(t+.time) in
   let if_not_found _ = Hashtbl.set times ~key:tag ~data:time in
   Hashtbl.find_and_call times tag ~if_found ~if_not_found;
   r
 let report_times () =
-   let open Hflmc2_util in
+   let open Rethfl_util in
   let kvs = Hashtbl.to_alist times in
   match List.max_elt ~compare (List.map kvs ~f:(String.length<<<fst)) with
   | None -> Print.pr "no time records"

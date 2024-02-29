@@ -1,4 +1,4 @@
-open Hflmc2_util
+open Rethfl_util
 open Rethfl_syntax
 open Id
 open Rtype

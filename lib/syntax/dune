@@ -8,7 +8,7 @@
  (name rethfl_syntax)
  (public_name rethfl.syntax)
  (libraries
-   hflmc2_util
+   rethfl_util
    rethfl_options
    menhirLib)
  (preprocess (pps ppx_deriving.std ppx_compare ppx_sexp_conv)))

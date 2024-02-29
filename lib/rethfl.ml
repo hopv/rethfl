@@ -1,4 +1,4 @@
-module Util        = Hflmc2_util
+module Util        = Rethfl_util
 module Options     = Rethfl_options
 module Syntax      = Rethfl_syntax
 module Typing      = Hflmc2_typing

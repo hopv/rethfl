@@ -1,5 +1,5 @@
 (library
- (name hflmc2_util)
+ (name rethfl_util)
  (public_name rethfl.util)
  (libraries
    core

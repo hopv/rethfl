@@ -1,4 +1,4 @@
-open Hflmc2_util
+open Rethfl_util
 type raw_hflz =
   | Bool of bool
   | Var  of string

@@ -2,7 +2,7 @@
  (public_name rethfl)
  (libraries
     eldarica
-    hflmc2_util
+    rethfl_util
     rethfl_syntax
     hflmc2_typing
     rethfl_options

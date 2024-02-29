@@ -37,13 +37,13 @@ let selected_solver size =
 
 (* set of template *)
 let call_template cmd timeout = 
-    let open Hflmc2_util in
+    let open Rethfl_util in
     fun file -> 
     let _, out, _ = Fn.run_command ~timeout:timeout (Array.concat [cmd; [|file|]]) in
     String.lsplit2 out ~on:'\n'
 
 let call_fptprove timeout file = 
-  let open Hflmc2_util in
+  let open Rethfl_util in
   let fptprove_path = 
     try Sys.getenv "fptprove" with
     | Not_found -> Filename.concat (Sys.getenv "HOME") "bitbucket.org/uhiro/fptprove"
@@ -142,7 +142,7 @@ let chc2smt2 chcs solver =
 
 
 let parse_model model = 
-  let open Hflmc2_util in
+  let open Rethfl_util in
   (* Ported from Iwayama san's parser 
      https://github.com/Hogeyama/hflmc2/blob/0c29b0b3a8aacb2496615244b3d93e98370c6eee/lib/refine/hornClauseSolver.ml#L215-L280
   *)
@@ -282,7 +282,7 @@ let save_chc_to_smt2 chcs solver =
 let check_sat ?(timeout=100000.0) chcs solver = 
   let check_sat_inner timeout solver = 
     let file = save_chc_to_smt2 chcs solver in
-    let open Hflmc2_util in
+    let open Rethfl_util in
     let f = selected_cmd timeout solver in
     match f file with
     | Some ("unsat", _) -> `Unsat
@@ -323,7 +323,7 @@ let rec unsat_proof_of_eldarica_cex nodes =
               args=Dag.(x.args);
               nodes=[];}::(unsat_proof_of_eldarica_cex xs) (* TODO *)
 let get_unsat_proof ?(timeout=100.0) chcs solver = 
-  let open Hflmc2_util in
+  let open Rethfl_util in
   let file = save_chc_to_smt2 chcs solver in
   let cmd = selected_cex_cmd solver in
   let _, out, _ = Fn.run_command ~timeout:timeout (Array.concat [cmd; [|file|]]) in

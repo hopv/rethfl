@@ -1,4 +1,4 @@
-open Hflmc2_util
+open Rethfl_util
 
 (** ['ty] is typically a type of the id *)
 type 'ty t =

@@ -1,4 +1,4 @@
-open Hflmc2_util
+open Rethfl_util
 include Set.Make'(Id.Key)
 let singleton : 'a. 'a Id.t -> t =
   fun v -> singleton (Id.remove_ty v)
