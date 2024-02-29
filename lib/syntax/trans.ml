@@ -382,7 +382,7 @@ module Simplify = struct
     fun rules ->
       rules
       |> begin
-          if !Hflmc2_options.Preprocess.inlining
+          if !Rethfl_options.Preprocess.inlining
           then Reduce.Hflz.inline
           else Fn.id
          end

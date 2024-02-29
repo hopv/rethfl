@@ -1,5 +1,5 @@
 open Rethfl_syntax
-open Hflmc2_options
+open Rethfl_options
 open Chc
 open Rtype
 open Smt2
@@ -287,7 +287,7 @@ let check_sat ?(timeout=100000.0) chcs solver =
     match f file with
     | Some ("unsat", _) -> `Unsat
     | Some ("sat", model) ->
-      let open Hflmc2_options in
+      let open Rethfl_options in
       if !Typing.show_refinement then
         `Sat(selected_parse_model model solver)
       else

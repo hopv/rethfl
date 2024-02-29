@@ -65,7 +65,7 @@ let rec _subtype t t' renv m =
    _subtype t2 t2' renv m
  | RArrow(t, s), RArrow(t', s') ->
    let m' = 
-   if !Hflmc2_options.Typing.mode_burn_et_al then
+   if !Rethfl_options.Typing.mode_burn_et_al then
      _subtype t' t renv m
    else
      _subtype t' t (conjoin renv (rty s')) m
@@ -280,7 +280,7 @@ let rec infer hes env top =
       if unsat then returns check_feasibility
     *)
     match call_solver_with_timer chcs (Chc_solver.selected_solver 1) with
-    | `Unsat when !Hflmc2_options.Typing.no_disprove -> `Unknown
+    | `Unsat when !Rethfl_options.Typing.no_disprove -> `Unknown
     | `Unsat -> check_feasibility chcs     
     | `Sat(x) -> `Sat(x)
     | `Fail -> `Fail
@@ -333,7 +333,7 @@ let rec infer hes env top =
       begin 
         match x with 
         | Ok(x) -> 
-          let open Hflmc2_options in
+          let open Rethfl_options in
           let hes = print_derived_refinement_type hes x in
           if !Typing.show_refinement then
             print_hes hes
