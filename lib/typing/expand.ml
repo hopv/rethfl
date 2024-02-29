@@ -2,7 +2,7 @@ open Chc_solver
 open Rhflz
 open Rtype
 open Rid
-open Hflmc2_syntax
+open Rethfl_syntax
 
 let gen_map nodes = 
   List.fold_left (fun m x -> 

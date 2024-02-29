@@ -1,5 +1,5 @@
 open Hflmc2_util
-open Hflmc2_syntax
+open Rethfl_syntax
 open Id
 open Rtype
 

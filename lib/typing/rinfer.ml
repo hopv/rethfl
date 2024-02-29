@@ -1,6 +1,6 @@
 open Rhflz 
 open Rtype
-open Hflmc2_syntax
+open Rethfl_syntax
 open Chc
 
 (* timer*)
@@ -288,7 +288,7 @@ let rec infer hes env top =
   and infer_main ?(size=1) hes env top = 
     (* 1. generate constraints *)
     print_hes hes;
-    let top_pred = get_top @@ Hflmc2_syntax.Id.(top.ty) in
+    let top_pred = get_top @@ Rethfl_syntax.Id.(top.ty) in
     let constraints = infer_hes hes env [{head=RTemplate(top_pred); body=RTrue}] in
     (*print_constraints constraints;*)
     (* 2. optimize CHC (ECHC) *)

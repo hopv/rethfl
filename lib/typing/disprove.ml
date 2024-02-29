@@ -1,5 +1,5 @@
 open Eldarica.Dag
-open Hflmc2_syntax
+open Rethfl_syntax
 
 type r = [`Invalid | `Unknown]
 

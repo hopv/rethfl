@@ -1,5 +1,5 @@
 open Rtype
-open Hflmc2_syntax
+open Rethfl_syntax
 
 type t =
   | Bool   of bool
@@ -39,4 +39,4 @@ let rec print = function
     Fmt.flush Fmt.stdout () ;
   | Pred (x,l) -> 
     Print.pred Fmt.stdout x;
-    Fmt.flush Fmt.stdout () 
+    Fmt.flush Fmt.stdout ()

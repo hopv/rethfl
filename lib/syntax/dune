@@ -5,7 +5,7 @@
  (modules lexer))
 
 (library
- (name hflmc2_syntax)
+ (name rethfl_syntax)
  (public_name rethfl.syntax)
  (libraries
    hflmc2_util

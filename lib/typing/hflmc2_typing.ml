@@ -6,11 +6,11 @@ module Result = Rresult
 module Chc = Chc
 
 let rec generate_env = function 
-  | [] -> Hflmc2_syntax.IdMap.empty
+  | [] -> Rethfl_syntax.IdMap.empty
   | x::xs -> 
     let m = generate_env xs in
     let open Rhflz in
-    Hflmc2_syntax.IdMap.add m x.var x.var.ty
+    Rethfl_syntax.IdMap.add m x.var x.var.ty
   
 let rec print_types = function
   | [] -> ()

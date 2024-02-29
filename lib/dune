@@ -3,7 +3,7 @@
  (libraries
     eldarica
     hflmc2_util
-    hflmc2_syntax
+    rethfl_syntax
     hflmc2_typing
     )
  (preprocess (pps ppx_deriving.std)))
