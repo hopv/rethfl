@@ -1,5 +1,5 @@
 (library
- (name hflmc2_typing)
+ (name rethfl_typing)
  (public_name rethfl.typing)
  (libraries
    core

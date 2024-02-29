@@ -1,7 +1,7 @@
 module Util        = Rethfl_util
 module Options     = Rethfl_options
 module Syntax      = Rethfl_syntax
-module Typing      = Hflmc2_typing
+module Typing      = Rethfl_typing
 module Eldarica    = Eldarica
 
 open Util

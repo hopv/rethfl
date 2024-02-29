@@ -4,7 +4,7 @@
     eldarica
     rethfl_util
     rethfl_syntax
-    hflmc2_typing
+    rethfl_typing
     rethfl_options
     )
  (preprocess (pps ppx_deriving.std)))
