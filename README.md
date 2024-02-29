@@ -47,6 +47,15 @@ Once the dependent packages have been installed, ReTHFL can be compiled by the f
 dune build
 ```
 
+An alternative way to obtain a reproducible build is to use the lock file.
+``` shell
+git clone git@github.com:hopv/rethfl.git
+cd rethfl
+opam switch create . --deps-only --locked
+dune build
+```
+(Note that this creates an opam switch.)
+
 ## External Dependencies
 ReTHFL uses (extended) CHC solvers for constraint solving.
 For most cases, the constraints are of the form of CHCs, so having CHC solvers such as [HoIce](https://github.com/hopv/hoice) or [Z3 (Spacer)](https://github.com/Z3Prover/z3) installed is enough.
