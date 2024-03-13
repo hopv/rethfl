@@ -1,5 +1,6 @@
 module Core = Core
 open Core
+module Unix = Core_unix
 
 module Pair = struct
   (* Bifunctor method *)

@@ -1,10 +1,11 @@
 (library
- (public_name hflmc3)
+ (public_name rethfl)
  (libraries
     eldarica
-    hflmc2_util
-    hflmc2_syntax
-    hflmc2_typing
-    ))
-
+    rethfl_util
+    rethfl_syntax
+    rethfl_typing
+    rethfl_options
+    )
+ (preprocess (pps ppx_deriving.std)))
 (env (dev (flags (:standard -warn-error -A))))

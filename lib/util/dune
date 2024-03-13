@@ -1,12 +1,14 @@
 (library
- (public_name hflmc2_util)
+ (name rethfl_util)
+ (public_name rethfl.util)
  (libraries
+   core
+   core_unix
    fmt
    logs
    logs.fmt
    lwt
-   lwt.unix
-   core))
+   lwt.unix))
 
 (env
   (dev

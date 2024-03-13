@@ -1,5 +1,5 @@
 
-open Hflmc2_util
+open Rethfl_util
 
 (******************************************************************************)
 (* Options                                                                    *)
@@ -167,7 +167,7 @@ let parse ?argv () : input option =
     const (fun _ file -> file)
       $ term_setup_log () (* NOTE order matters *)
       $ term_set_up_params ()
-  in match Cmdliner.Term.(eval ?argv (term (), info "hflmc2")) with
+  in match Cmdliner.Term.(eval ?argv (term (), info "rethfl")) with
   | `Ok [] -> Some `Stdin
   | `Ok [file] -> Some (`File file)
   | `Ok _ -> Fn.todo ~info:"multiple input files" ()

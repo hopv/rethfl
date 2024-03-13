@@ -1,3 +1,3 @@
 #!/bin/bash
 
-dune exec hflmc3 -- $@
+dune exec rethfl -- $@

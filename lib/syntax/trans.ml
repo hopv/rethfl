@@ -1,4 +1,4 @@
-open Hflmc2_util
+open Rethfl_util
 open Type
 module S = struct
   module Id      = Id
@@ -219,26 +219,26 @@ module Reduce = struct
       | phi -> phi
     let rec ones = 1 :: ones
     module Scc(Key: Map.Key) = struct
-      module Set = Set.Make'(Key)
-      module Map = Map.Make'(Key)
-      type graph = Set.t Map.t
+      module NodeSet = Set.Make'(Key)
+      module NodeMap = Map.Make'(Key)
+      type graph = NodeSet.t NodeMap.t
       let rg : graph -> graph = fun g ->
-        Map.fold g ~init:Map.empty ~f:begin fun ~key ~data:set map ->
+        Map.fold g ~init:NodeMap.empty ~f:begin fun ~key ~data:set map ->
           let map' =
             if Map.mem map key
             then map
-            else Map.add_exn map ~key ~data:Set.empty
+            else Map.add_exn map ~key ~data:NodeSet.empty
           in
           Set.fold set ~init:map' ~f:begin fun map v ->
             let data =
               match Map.find map v with
               | Some s -> Set.add s key
-              | None   -> Set.singleton key
+              | None   -> NodeSet.singleton key
             in
-            Map.replace map ~key:v ~data
+            NodeMap.replace map ~key:v ~data
           end
         end
-      let rec dfs : graph -> Set.t -> Key.t list -> graph * Key.t list =
+      let rec dfs : graph -> NodeSet.t -> Key.t list -> graph * Key.t list =
         fun g ls r ->
           Set.fold ls ~init:(g,r) ~f:begin fun (g,r) x ->
             match Map.find g x with
@@ -257,7 +257,7 @@ module Reduce = struct
               end
       let scc g =
         let rG = rg g in
-        let map, vs = dfs g (Set.of_list @@ Map.keys g) [] in
+        let map, vs = dfs g (NodeSet.of_list @@ Map.keys g) [] in
         let _, ls =
           List.fold vs ~init:(rG, []) ~f:begin fun (rg,ls) v ->
             let rg2, l = rdfs rg v [] in
@@ -282,7 +282,7 @@ module Reduce = struct
               Hflz.fvs rule.body
               |> IdSet.filter ~f:begin fun x -> (* filter nonterminals *)
                   let c = String.get x.Id.name 0 in
-                  c == Char.uppercase c (* XXX ad hoc *)
+                  c == Char.uppercase_ascii c (* XXX ad hoc *)
                  end
             in Id.remove_ty id ,dep
           end
@@ -382,7 +382,7 @@ module Simplify = struct
     fun rules ->
       rules
       |> begin
-          if !Hflmc2_options.Preprocess.inlining
+          if !Rethfl_options.Preprocess.inlining
           then Reduce.Hflz.inline
           else Fn.id
          end

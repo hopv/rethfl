@@ -1,7 +1,7 @@
-module Util        = Hflmc2_util
-module Options     = Hflmc2_options
-module Syntax      = Hflmc2_syntax
-module Typing      = Hflmc2_typing
+module Util        = Rethfl_util
+module Options     = Rethfl_options
+module Syntax      = Rethfl_syntax
+module Typing      = Rethfl_typing
 module Eldarica    = Eldarica
 
 open Util
@@ -11,6 +11,7 @@ let log_src = Logs.Src.create "Main"
 module Log = (val Logs.src_log @@ log_src)
 
 type result = [ `Valid | `Invalid | `Unknown | `Fail]
+  [@@deriving eq]
 
 let show_result = function
   | `Valid      -> "Valid"

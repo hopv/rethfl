@@ -1,4 +1,4 @@
-open Hflmc2_util
+open Rethfl_util
 
 (** ['ty] is typically a type of the id *)
 type 'ty t =
@@ -15,7 +15,7 @@ let gen_id () = counter#tick
 
 let to_string id =
   let c = String.get id.name 0 in
-  if c = Char.uppercase c
+  if c = Char.uppercase_ascii c
   then id.name
   else id.name ^ string_of_int id.id
 

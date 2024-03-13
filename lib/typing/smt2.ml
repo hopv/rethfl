@@ -1,4 +1,4 @@
-open Hflmc2_syntax
+open Rethfl_syntax
 open Rtype
 open Fpl
 

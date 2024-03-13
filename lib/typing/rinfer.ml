@@ -1,6 +1,6 @@
 open Rhflz 
 open Rtype
-open Hflmc2_syntax
+open Rethfl_syntax
 open Chc
 
 (* timer*)
@@ -9,16 +9,16 @@ let measure_time f =
   let result = f () in
   let stop   = Unix.gettimeofday () in
   result, stop -. start
-let times = let open Hflmc2_util in Hashtbl.create (module String)
+let times = let open Rethfl_util in Hashtbl.create (module String)
 let add_mesure_time tag f =
-   let open Hflmc2_util in
+   let open Rethfl_util in
   let r, time = measure_time f in
   let if_found t = Hashtbl.set times ~key:tag ~data:(t+.time) in
   let if_not_found _ = Hashtbl.set times ~key:tag ~data:time in
   Hashtbl.find_and_call times tag ~if_found ~if_not_found;
   r
 let report_times () =
-   let open Hflmc2_util in
+   let open Rethfl_util in
   let kvs = Hashtbl.to_alist times in
   match List.max_elt ~compare (List.map kvs ~f:(String.length<<<fst)) with
   | None -> Print.pr "no time records"
@@ -31,7 +31,7 @@ let report_times () =
         in Print.pr "%s %f sec@." s v
       end
 
-(* The above code should be merged in hflmc2.ml... *)
+(* The above code should be merged in rethfl.ml... *)
 
 let new_var () = RId(Id.gen `Int)
 let rec rty = function
@@ -65,7 +65,7 @@ let rec _subtype t t' renv m =
    _subtype t2 t2' renv m
  | RArrow(t, s), RArrow(t', s') ->
    let m' = 
-   if !Hflmc2_options.Typing.mode_burn_et_al then
+   if !Rethfl_options.Typing.mode_burn_et_al then
      _subtype t' t renv m
    else
      _subtype t' t (conjoin renv (rty s')) m
@@ -280,7 +280,7 @@ let rec infer hes env top =
       if unsat then returns check_feasibility
     *)
     match call_solver_with_timer chcs (Chc_solver.selected_solver 1) with
-    | `Unsat when !Hflmc2_options.Typing.no_disprove -> `Unknown
+    | `Unsat when !Rethfl_options.Typing.no_disprove -> `Unknown
     | `Unsat -> check_feasibility chcs     
     | `Sat(x) -> `Sat(x)
     | `Fail -> `Fail
@@ -288,7 +288,7 @@ let rec infer hes env top =
   and infer_main ?(size=1) hes env top = 
     (* 1. generate constraints *)
     print_hes hes;
-    let top_pred = get_top @@ Hflmc2_syntax.Id.(top.ty) in
+    let top_pred = get_top @@ Rethfl_syntax.Id.(top.ty) in
     let constraints = infer_hes hes env [{head=RTemplate(top_pred); body=RTrue}] in
     (*print_constraints constraints;*)
     (* 2. optimize CHC (ECHC) *)
@@ -333,7 +333,7 @@ let rec infer hes env top =
       begin 
         match x with 
         | Ok(x) -> 
-          let open Hflmc2_options in
+          let open Rethfl_options in
           let hes = print_derived_refinement_type hes x in
           if !Typing.show_refinement then
             print_hes hes
