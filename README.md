@@ -1,4 +1,6 @@
 # ReTHFL
+[![CI](https://github.com/hopv/rethfl/actions/workflows/ci.yml/badge.svg)](https://github.com/hopv/rethfl/actions/workflows/ci.yml)
+
 A nuHFL(Z) (aka higher-order CHC) solver based on refinement types.
 
 ## Install and Build
