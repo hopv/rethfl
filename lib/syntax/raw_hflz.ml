@@ -211,7 +211,11 @@ module Typing = struct
             in
             self#add_ty_env x TvInt; Arith.mk_var x
         | Op (op, as') -> Op (op, List.map ~f:(self#arith id_env) as')
-        | _ -> failwith "annot.arith"
+        | _ -> Log.err begin fun m -> m ~header:"annot.arith"
+              "term %a is expected to be an arithmetic expression" pp_raw_hflz a;
+               end;
+               Fn.fatal "ill-typed"
+
 
     method term : id_env -> raw_hflz -> tyvar -> unit Hflz.t =
       fun id_env psi tv ->
