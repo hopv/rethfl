@@ -56,6 +56,10 @@ let main file =
   Log.app begin fun m -> m ~header:"Simplified" "%a"
     Print.(hflz_hes simple_ty_) psi
   end;
+  let psi = Syntax.Trans.Peephole.hflz_hes psi in
+  Log.app begin fun m -> m ~header:"Peephole" "%a"
+    Print.(hflz_hes simple_ty_) psi
+  end;
   let psi, top = Syntax.Trans.Preprocess.main psi in
   match top with
   | Some(top) -> begin

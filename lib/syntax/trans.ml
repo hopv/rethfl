@@ -577,6 +577,40 @@ module RemoveDisjunction = struct
 
 end
 
+module Peephole = struct
+  let rec translate_body = fun body ->
+    let open Hflz in
+    match body with
+    | Bool _
+    | Arith _
+    | Var _
+    | Pred(_, _) -> body
+    | Or(x, y) ->
+      let x' = translate_body x in
+      let y' = translate_body y in
+      Or(x', y')
+    | And(x, y) ->
+      let x' = translate_body x in
+      let y' = translate_body y in
+      And(x', y')
+    | Forall(x, y) ->
+      let y' = translate_body y in
+      Forall(x, y')
+    | Abs(id, y) ->
+      let y' = translate_body y in
+      Abs(id, y')
+    | App(x, y) ->
+      let x' = translate_body x in
+      let y' = translate_body y in
+      begin match x with
+        | Abs(id, x'') -> Subst.Hflz.hflz (IdMap.of_list [id,y']) x''
+        | _ -> App(x', y')
+      end
+  let hflz_hes_rule : 'a Hflz.hes_rule -> 'a Hflz.hes_rule =
+    fun rule -> { rule with body = translate_body rule.body }
+  let hflz_hes : simple_ty Hflz.hes -> simple_ty Hflz.hes = List.map ~f:hflz_hes_rule
+end
+
 module Preprocess = struct
   (* gets hes_rule list. returns hes_rule list and toplevel name*)
   let translate_top top_rule = 
