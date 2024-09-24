@@ -606,8 +606,12 @@ module Peephole = struct
         | Abs(id, x'') -> Subst.Hflz.hflz (IdMap.of_list [id,y']) x''
         | _ -> App(x', y')
       end
+  let rec saturate body = 
+    let body' = translate_body body in
+    if body = body' then body
+    else saturate body'
   let hflz_hes_rule : 'a Hflz.hes_rule -> 'a Hflz.hes_rule =
-    fun rule -> { rule with body = translate_body rule.body }
+    fun rule -> { rule with body = saturate rule.body }
   let hflz_hes : simple_ty Hflz.hes -> simple_ty Hflz.hes = List.map ~f:hflz_hes_rule
 end
 
