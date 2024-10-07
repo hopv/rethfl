@@ -29,6 +29,7 @@ module Typing = struct
   let show_refinement      = ref (Obj.magic())
   let mode_burn_et_al      = ref (Obj.magic())
   let no_disprove          = ref (Obj.magic())
+  let smt_output_dir       = ref (Obj.magic())
 end
 
 (******************************************************************************)
@@ -95,6 +96,9 @@ type params =
 
   ; no_disprove: bool [@default false]
     (** Disable disproving*)
+
+  ; smt_output_dir: string option
+    (** Set output dir for smt2 files *)
   }
   [@@deriving cmdliner,show]
 
@@ -112,6 +116,7 @@ let set_up_params params =
   set_ref Typing.show_refinement           params.show_refinement;
   set_ref Typing.mode_burn_et_al           params.mode_burn_et_al;
   set_ref Typing.no_disprove               params.no_disprove;
+  set_ref Typing.smt_output_dir            params.smt_output_dir;
   params.input
 
 (******************************************************************************)

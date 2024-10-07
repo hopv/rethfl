@@ -24,7 +24,11 @@ let save_fpl_to_smt2 solver fpl =
     let smt2 = fpl2smt2 solver fpl in
     Random.self_init ();
     let r = Random.int 0x10000000 in
-    let file = Printf.sprintf "/tmp/%s-%d.smt2" (name_of_solver solver) r in
+    let base = match !Rethfl_options.Typing.smt_output_dir with
+      | Some x -> x
+      | None -> "/tmp"
+    in
+    let file = Printf.sprintf "%s/%s-%d.smt2" base (name_of_solver solver) r in
     let oc = open_out file in
     Printf.fprintf oc "%s" smt2;
     close_out oc;
