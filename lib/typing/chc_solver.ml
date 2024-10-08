@@ -3,6 +3,7 @@ open Rethfl_options
 open Chc
 open Rtype
 open Smt2
+module Unix = Core_unix
 
 type solver = [`Spacer | `Hoice | `Fptprove | `Eldarica | `Liu]
 
@@ -35,11 +36,24 @@ let selected_solver size =
   else if sv = "fptprove" then `Fptprove
   else failwith ("Unknown solver: " ^ sv)
 
+let get_smt_tmp_file name = 
+    let base = match !Rethfl_options.Typing.smt_output_dir with
+      | Some x -> x
+      | None -> "/tmp"
+    in
+    Unix.mkstemp (Printf.sprintf "%s/%s" base name)
+  
+let run_command ?(timeout=20.0) cmd =
+  let open Rethfl_util in
+  let f_out, fd_out = get_smt_tmp_file "run_command.stdout" in
+  let f_err, fd_err = get_smt_tmp_file "run_command.stderr" in
+  Fn.run_command_with_tmpfiles ~timeout:timeout cmd (f_out, fd_out) (f_err, fd_err)
+
 (* set of template *)
 let call_template cmd timeout = 
     let open Rethfl_util in
     fun file -> 
-    let _, out, _ = Fn.run_command ~timeout:timeout (Array.concat [cmd; [|file|]]) in
+    let _, out, _ = run_command ~timeout:timeout (Array.concat [cmd; [|file|]]) in
     String.lsplit2 out ~on:'\n'
 
 let call_fptprove timeout file = 
@@ -49,7 +63,7 @@ let call_fptprove timeout file =
     | Not_found -> Filename.concat (Sys.getenv "HOME") "bitbucket.org/uhiro/fptprove"
   in
   Sys.chdir fptprove_path;
-  let _, out, _ = Fn.run_command ~timeout:timeout (Array.concat [[|"./script/rethfl.sh"|]; [|file|]]) in
+  let _, out, _ = run_command ~timeout:timeout (Array.concat [[|"./script/rethfl.sh"|]; [|file|]]) in
   let l = String.split out ~on:',' in
   match List.nth l 1 with
     | Some(x) -> Some(x, "")
@@ -330,6 +344,6 @@ let get_unsat_proof ?(timeout=100.0) chcs solver =
   let open Rethfl_util in
   let file = save_chc_to_smt2 chcs solver in
   let cmd = selected_cex_cmd solver in
-  let _, out, _ = Fn.run_command ~timeout:timeout (Array.concat [cmd; [|file|]]) in
+  let _, out, _ = run_command ~timeout:timeout (Array.concat [cmd; [|file|]]) in
   let p = Eldarica.parse_string out in
   unsat_proof_of_eldarica_cex p
