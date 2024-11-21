@@ -72,6 +72,10 @@ let main file =
         Log.app begin fun m -> m ~header:"RemoveDisj" "%a"
           Print.(hflz_hes simple_ty_) psi
         end;
+        let psi = Syntax.Trans.Peephole.hflz_hes psi in
+        Log.app begin fun m -> m ~header:"Peephole" "%a"
+          Print.(hflz_hes simple_ty_) psi
+        end;
         psi
       end
     else psi in

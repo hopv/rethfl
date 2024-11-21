@@ -51,6 +51,10 @@ let mk_apps t ts = List.fold_left ts ~init:t ~f:mk_app
 let mk_abs x t = Abs(x, t)
 let mk_abss xs t = List.fold_right xs ~init:t ~f:mk_abs
 
+let is_var x = match x with
+  | Var _ -> true
+  | _ -> false
+
 (* Decomposition *)
 let decompose_abs =
   let rec go acc phi = match phi with

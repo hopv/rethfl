@@ -578,6 +578,33 @@ module RemoveDisjunction = struct
 end
 
 module Peephole = struct
+  let rec count_occur_arith x (a:  S.Arith.t) =
+    let open Hflz in
+    match a with
+    | Var y -> if x = y.id then 1 else 0
+    | Op(_, args) ->
+        List.fold_left args ~init:0 ~f:(fun acc a' -> acc + count_occur_arith x a')
+
+    | Int _  -> 0
+
+  let rec count_occur x body =
+  let open Hflz in
+  match body with
+  | Bool _ -> 0
+  | Arith a -> count_occur_arith x a
+  | Var y -> if x = y.id then 1 else 0
+  | Pred(_, args) ->
+    List.fold_left args ~init:0 ~f: (fun acc arg -> acc + count_occur_arith x arg) 
+  | Or(left, right)
+  | And(left, right) ->
+    count_occur x left + count_occur x right
+  | Forall(y, body) ->
+    if x = y.id then 0 else count_occur x body
+  | Abs(id, body) ->
+    if x = id.id then 0 else count_occur x body
+  | App(left, right) ->
+    count_occur x left + count_occur x right
+
   let rec translate_body = fun body ->
     let open Hflz in
     match body with
@@ -602,8 +629,8 @@ module Peephole = struct
     | App(x, y) ->
       let x' = translate_body x in
       let y' = translate_body y in
-      begin match x with
-        | Abs(id, x'') -> Subst.Hflz.hflz (IdMap.of_list [id,y']) x''
+      begin match x' with
+        | Abs(id, x'') when count_occur id.id x'' <= 1 || is_var y' -> Subst.Hflz.hflz (IdMap.of_list [id,y']) x''
         | _ -> App(x', y')
       end
   let rec saturate body = 
