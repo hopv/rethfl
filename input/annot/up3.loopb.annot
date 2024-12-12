@@ -1,0 +1,3 @@
+%TYPE
+
+LOOPB : j:int -> k:int -> n:int -> (* -> *) -> *[2*k >= n-j]

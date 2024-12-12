@@ -1,0 +1,7 @@
+%TYPE
+
+MERGE :
+  (int -> int -> (int -> *) -> *) ->
+  l1:int -> (int -> (int -> *) -> *) ->
+  l2:int -> (int -> (int -> *) -> *) ->
+  (l3:int -> (int -> (int -> *) -> *) -> *[l1 < 0 \/ l2 < 0 \/ l3 = l1 + l2]) -> *

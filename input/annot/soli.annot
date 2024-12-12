@@ -1,0 +1,9 @@
+%TYPE
+
+SOLVE :
+  * ->
+  int ->
+  (int -> int -> (int -> *) -> *) ->
+  (int -> (int -> int -> int -> int -> *) -> *) ->
+  (int -> *) ->
+  (e:int -> *[ff]) -> *
