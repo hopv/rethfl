@@ -1,0 +1,53 @@
+%HES
+MAIN_1425  =v
+  ((arg1_1758 <= 0 \/ arg3_1666 <= 0)
+   \/ LOOPSHIFT arg3_1666 arg1_1758 (MAKE_ARRAY arg3_1666 arg4_1631) (-1) 1 (MAKE_ARRAY arg3_1666 (-1))
+       (\shiftArray3_1733.
+         LOOP arg3_1666 arg1_1758 (MAKE_ARRAY arg3_1666 arg4_1631) shiftArray3_1733 (MAKE_ARRAY arg1_1758 arg2_1707) 0
+          0 (\u_1756.true)))
+  /\ (arg1_1758 > 0 /\ arg3_1666 > 0 \/ true).
+FAIL_1543 u_1544 k_1545 =v false.
+LOOP plen slen pat shiftArray3_598 str s p k_kmpMatch_loop_487 =v
+  (p >= plen
+   \/ (s >= slen
+       \/ str s
+           (\x_1750.
+             pat p
+              (\x_1704.
+                (x_1750 != x_1704 \/ LOOP plen slen pat shiftArray3_598 str (s + 1) (p + 1) k_kmpMatch_loop_487)
+                /\ (x_1750 = x_1704
+                    \/ (p != 0 \/ LOOP plen slen pat shiftArray3_598 str (s + 1) p k_kmpMatch_loop_487)
+                       /\ (p = 0
+                           \/ shiftArray3_598 (p - 1)
+                               (\x_1662.LOOP plen slen pat shiftArray3_598 str s (x_1662 + 1) k_kmpMatch_loop_487))))))
+      /\ (s < slen \/ k_kmpMatch_loop_487 0))
+  /\ (p < plen \/ k_kmpMatch_loop_487 (s - plen)).
+LOOPSHIFT plen slen pat i j shiftArray1 k_kmpMatch_loopShift_118 =v
+  (j != plen \/ k_kmpMatch_loopShift_118 shiftArray1)
+  /\ (j = plen
+      \/ pat j
+          (\x_1741.
+            pat (i + 1)
+             (\x_1684.
+               (x_1741 = x_1684
+                \/ (i < 0
+                    \/ shiftArray1 i (\x_1641.LOOPSHIFT plen slen pat x_1641 j shiftArray1 k_kmpMatch_loopShift_118))
+                   /\ (i >= 0 \/ LOOPSHIFT plen slen pat (-1) (j + 1) shiftArray1 k_kmpMatch_loopShift_118))
+               /\ (x_1741 != x_1684
+                   \/ (i + 1 >= j
+                       \/ shiftArray1 j
+                           (\u_1772.
+                             shiftArray1 j
+                              (\x_1626.
+                                LOOPSHIFT plen slen pat x_1626 (j + 1)
+                                 (\j_1726.
+                                   \k_update_1727.
+                                    (j != j_1726 \/ k_update_1727 (i + 1))
+                                    /\ (j = j_1726 \/ shiftArray1 j_1726 k_update_1727))
+                                 k_kmpMatch_loopShift_118)))
+                      /\ (i + 1 < j
+                          \/ shiftArray1 j
+                              (\x_1626.LOOPSHIFT plen slen pat x_1626 (j + 1) shiftArray1 k_kmpMatch_loopShift_118)))))).
+MAKE_ARRAY n_10 s_9 i_8 k_make_array_15 =v
+  ((0 > i_8 \/ i_8 >= n_10) \/ k_make_array_15 s_9) /\ (0 <= i_8 /\ i_8 < n_10 \/ FAIL_1543 true (\x_1776.true)).
+Forall p      =v ∀n. p n.

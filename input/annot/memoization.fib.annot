@@ -1,0 +1,8 @@
+%TYPE
+
+F :
+int ->
+int ->
+(int -> (int -> int -> *) -> *) ->
+n:int ->
+(int -> (int -> (int -> int -> *) -> *) -> r:int -> *[1 <= r /\ n-1 <= r]) -> *

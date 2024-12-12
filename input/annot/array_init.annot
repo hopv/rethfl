@@ -1,0 +1,6 @@
+%TYPE
+INIT :
+  i:int ->
+  n:int ->
+  (j:int -> ((v:int -> *[j<0 \/ i<=j \/ v=1]) -> *)) ->
+  ((j:int -> (v:int -> *[j<0 \/ n<=j \/ v=1]) -> *) -> *) -> *

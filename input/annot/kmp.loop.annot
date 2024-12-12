@@ -1,0 +1,12 @@
+%TYPE
+
+LOOP:
+  (plen: int ->
+  (slen: int ->
+  ((i: int -> ((int -> *) -> *[(0 <= i /\ i < plen)])) ->
+  ((i: int -> ((v: int -> *[(0 <= v + 1 /\ v + 1 < plen)]) -> *[(0 <= i /\ i < plen)])) ->
+  ((i: int -> ((int -> *) -> *[(0 <= i /\ i < slen)])) ->
+  (s: int ->
+  (p: int ->
+  ((int -> *) ->
+  *[0<plen /\ 0<slen /\ 0<=p /\ 0<=s]))))))))

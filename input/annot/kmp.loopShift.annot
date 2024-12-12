@@ -1,0 +1,11 @@
+%TYPE
+
+LOOPSHIFT :
+  (plen: int ->
+  (slen: int ->
+  ((i: int -> ((int -> *) -> *[0 <= i /\ i < plen])) ->
+  (i: int ->
+  (j: int ->
+  ((ain_i: int -> ((ain_v: int -> *[(-1<=ain_v /\ ain_v<=ain_i - 1)]) -> *[(0<=ain_i /\ ain_i<plen)])) ->
+  (((aout_i: int -> ((aout_v: int -> *[(-1<=aout_v /\ aout_v<=aout_i - 1)]) -> *[(0<=aout_i /\ aout_i<plen)])) -> *) ->
+  *[0<plen /\ -1<=i /\ i<=plen - 2 /\ i + 1<=j /\ j<=plen])))))))
