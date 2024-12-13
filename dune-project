@@ -2,11 +2,11 @@
 (using menhir 2.0)
 (name rethfl)
 (generate_opam_files)
-(version 0.1)
+(version 0.2)
 (source (github hopv/rethfl))
 (license Apache-2.0)
 (authors "katsura" "Hogeyama")
-(maintainers "katsura@kb.is.s.u-tokyo.ac.jp")
+(maintainers "Hiroyuki Katsura <katsura@kb.is.s.u-tokyo.ac.jp>, Ken Sakayori <sakayori@kb.is.s.u-tokyo.ac.jp>")
 
 (package
   (name rethfl)
