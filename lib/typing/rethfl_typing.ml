@@ -34,5 +34,5 @@ let main x top_old =
   match !Rethfl_options.Typing.target with
   | "" -> Infer.infer y env top
   | "toplevel" -> Infer.infer_based_on_annotations y env top !Rethfl_options.Typing.annot
-  | "annotation" -> Infer.check_annotation y env top !Rethfl_options.Typing.annot
+  | "annotation" -> Infer.check_annotation y env !Rethfl_options.Typing.annot
   | _ -> failwith "Invalid -target"
