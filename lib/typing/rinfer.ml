@@ -465,16 +465,12 @@ let infer_based_on_annotations hes (env: Rtype.t IdMap.t) top file =
   infer hes env top 
   
 
-let check_annotation hes env top file =
+let check_annotation hes env file =
   let annotation = annotation_of file hes in
 
-  (* let app = List.find (fun x -> x.var.name = "APP") hes in
-  print_string (string_of_rty_skeleton app.var.ty);
-  failwith "hoge"; *)
-
-  (* specify type of SUM in env *)
   print_env env;
 
+  (* replace the types in the type environment by the given annotation *)
   let env = Rethfl_syntax.IdMap.mapi env ~f:(fun ~key:id ~data:rty -> (
     if id.name = annotation.annotated_func
         then annotation.annotated_type
@@ -482,110 +478,18 @@ let check_annotation hes env top file =
   )) in
 
   print_env env;
-  (* END: specify type of SUM in env *)
 
+  (* get the annotated function  *)
   let top = (List.find (fun x -> x.var.name = annotation.annotated_func) hes).var in
-  let hes = List.map (fun x ->
-    let open Rhflz in
-      {x with body=Rhflz.translate_if x.body}) hes
-  in
 
   (* remove unrelated rules *)
   let hes = List.filter (fun x -> List.exists (fun s -> s = x.var.name) annotation.dependencies_annotated_func) hes in
 
-  (* modify the expected type of SUM in hes *)
+  (* modify the expected type of predicate variables in hes *)
   let hes = List.map (fun x ->
     if x.var.name = annotation.annotated_func then (
       {x with var={x.var with ty=annotation.annotated_type}}
     ) else x
   ) hes in
-  (* END: modify the expected type of SUM in hes *)
-  let call_solver_with_timer hes solver =
-    add_mesure_time "CHC Solver" @@ fun () ->
-    Chc_solver.check_sat hes solver
-  in
-  let check_feasibility chcs =
-    (* 1. generate constraints by using predicates for tracking cex *)
-    let p = Chc_solver.get_unsat_proof chcs `Eldarica in
-    let open Disprove in
-    match disprove p hes env top with
-    | `Invalid -> `Unsat
-    | `Unknown -> `Unknown
-  in
-  (* CHC Size is 1, then it is tractable *)
-  (* size: intersection type size *)
-  let rec try_intersection_type chcs size =
-    (*
-      if sat then return Valid
-      if unsat then returns check_feasibility
-    *)
-    match call_solver_with_timer chcs (Chc_solver.selected_solver 1) with
-    | `Unsat when !Rethfl_options.Typing.no_disprove -> `Unknown
-    | `Unsat -> check_feasibility chcs
-    | `Sat(x) -> `Sat(x)
-    | `Fail -> `Fail
-    | `Unknown -> `Unknown
-  and infer_main ?(size=1) hes env top =
-    (* 1. generate constraints *)
-    print_hes hes;
-    let constraints = infer_hes hes env [] in
-    (*print_constraints constraints;*)
-    (* 2. optimize CHC (ECHC) *)
-    let constraints = List.map (fun chc ->
-      {chc with head=translate_if chc.head}
-    ) constraints in
 
-    let simplified = simplify constraints in
-    let size = dnf_size simplified in
-    Printf.printf "[Size] %d\n" size;
-
-    if size > 1 then begin
-      (* この辺使ってなさそう、size<=1っぽい *)
-      let dual = List.map Chc.dual constraints in
-      let simplified_dual = simplify dual in
-      let size_dual = dnf_size simplified_dual in
-      Printf.printf "[Dual Size] %d\n" size_dual;
-      let min_size = if size < size_dual then size else size_dual in
-      let target = if size < size_dual then simplified else simplified_dual in
-      let use_dual = size >= size_dual in
-
-
-      let target' = expand target in
-      print_string "remove or or\n";
-      print_constraints target';
-      (* 3. check satisfiability *)
-      (* match call_solver_with_timer target' (Chc_solver.selected_solver 1) with
-      | `Sat(x) -> `Sat(x)
-      | `Fail -> failwith "hoge"
-      | _ ->
-        begin *)
-          if min_size > 1 then (print_string "[Warning]Some definite clause has or-head\n";flush stdout)
-          else (print_string "easy\n"; flush stdout);
-          if min_size > 1 then
-            (* if size > 1 /\ dual_size > 1 *)
-            use_dual, call_solver_with_timer target Chc_solver.(`Fptprove)
-          else
-            use_dual, try_intersection_type target min_size
-        (* end *)
-    end else (* if size <= 1 *)
-      false, try_intersection_type simplified size
-  in
-  let (is_dual_chc, x) = infer_main hes env top in
-  report_times ();
-  match x with
-  | `Sat(x) ->
-      begin
-        match x with
-        | Ok(x) ->
-          let open Rethfl_options in
-          let hes = print_derived_refinement_type is_dual_chc hes x in
-          if !Typing.show_refinement then
-            print_hes hes
-          else
-            ()
-        | Error(s) -> Printf.printf "%s\n" s
-      end;
-      `Sat
-  | `Unsat -> `Unsat
-  | `Fail -> `Fail
-  | `Unknown -> `Unknown
+  infer hes env top
