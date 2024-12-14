@@ -16,57 +16,29 @@ type t =
   | Arith  of Arith.t
   | Pred   of Formula.pred * Arith.t list
 
-let rec print_formula = function
-  | Bool x when x -> Printf.printf "tt"
-  | Bool _ -> Printf.printf "ff"
-  | Var x -> Printf.printf "%s" (Id.to_string x)
-  | Or (x, y, _, _) -> 
-    Printf.printf "(";
-    print_formula x;
-    Printf.printf " || ";
-    print_formula y;
-    Printf.printf ")";
-  | And (x, y, tx, ty) -> 
-    Printf.printf "(";
-    print_formula x;
-    print_string ":";
-    print_template tx;
-    Printf.printf " && ";
-    print_formula y;
-    print_string ":";
-    print_template ty;
-    Printf.printf ")";
-  | Abs (x, y) -> 
-    Printf.printf "(";
-    Printf.printf "\\";
-    print_rtype x.ty;
-    Printf.printf ".";
-    print_formula y;
-    Printf.printf ")"
-  | Forall (x, y, _) -> 
-    Printf.printf "(";
-    Printf.printf "∀";
-    print_rtype x.ty;
-    Printf.printf ".";
-    print_formula y;
-    Printf.printf ")"
-  | App (x, y, template) -> 
-    Printf.printf "(";
-    print_formula x;
-    Printf.printf " ";
-    print_formula y;
-    Printf.printf ")";
-  | Arith x ->
-    Print.arith Fmt.stdout x;
-    Fmt.flush Fmt.stdout () 
-  | Pred (x,[f1; f2]) -> 
-    Print.arith Fmt.stdout f1;
-    Print.pred Fmt.stdout x;
-    Print.arith Fmt.stdout f2;
-    Fmt.flush Fmt.stdout () ;
-  | Pred (x,_) -> 
-    Print.pred Fmt.stdout x;
-    Fmt.flush Fmt.stdout () 
+let rec pp_formula ppf = function
+  | Bool x when x -> Fmt.string ppf "tt"
+  | Bool _ -> Fmt.string ppf "ff"
+  | Var x -> Fmt.string ppf @@ Id.to_string x
+  | Or (x, y, _, _) ->
+    Fmt.pf ppf "(@[<hov 1>%a@ || %a@])" pp_formula x pp_formula y
+  | And (x, y, tx, ty) ->
+    Fmt.pf ppf "(@[<hov 1>%a:%a@ && %a:%a@])"
+      pp_formula x pp_template tx pp_formula y pp_template ty
+  | Abs (x, y) ->
+    Fmt.pf ppf "(@[<1>\\%a.@,%a@])" pp_rtype x.ty pp_formula y
+  | Forall (x, y, _) ->
+    Fmt.pf ppf "(@[<1>∀%a.@,%a@])" pp_rtype x.ty pp_formula y
+  | App (x, y, _) ->
+    Fmt.pf ppf "(@[<1>%a  %a@])" pp_formula x pp_formula y
+  | Arith x -> Fmt.pf ppf "(%a)" Print.arith x
+  | Pred (x,[f1; f2]) ->
+    Fmt.pf ppf "(%a%a%a)" Print.arith f1 Print.pred x Print.arith f2
+  | Pred (x,_) -> Print.pred ppf x
+
+let print_formula f =
+  pp_formula Fmt.stdout f;
+  Fmt.flush Fmt.stdout ()
 
 let rec is_simple p = match p with
   | And(x, y, _, _) | Or(x, y, _, _) -> (is_simple x && is_simple y)
