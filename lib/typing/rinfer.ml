@@ -7,6 +7,8 @@ open Rethfl_syntax
 open Chc
 
 module Parser = P
+let log_src = Logs.Src.create ~doc:"Debug log for refinemnet type inference" "Rinfer"
+module Log = (val Logs.src_log log_src)
 
 (* timer*)
 let measure_time f =
@@ -170,33 +172,33 @@ let rec infer_formula track formula env m ints =
       end
 
 let infer_rule track (rule: hes_rule) env (chcs: (refinement, refinement) chc list): (refinement, refinement) chc list =
-  print_newline();
-  print_newline();
-  print_string "infering new formula: ";
-  Printf.printf "%s = " rule.var.name;
-  print_formula rule.body;
-  print_newline();
-  (* infer type of rule.body using env *)
-  let (t, m) = infer_formula track rule.body env chcs [] in
-  (* generate constraint that inferred type `t` is subtype of var type *)
-  let m = subtype t rule.var.ty m in
-  print_string "[Result]\n";
-  print_constraints m;
-  m
+  Log.info begin fun m ->
+    m ~header:"Infering new formula" "%s = %a" rule.var.name pp_formula rule.body
+  end;
 
-let rec infer_hes ?(track=false) (hes: hes) env (accum_constraints: (refinement, refinement) chc list): (refinement, refinement) chc list = match hes with
-  | [] -> accum_constraints
+  let (t, cs) = infer_formula track rule.body env chcs [] in
+  let cs = subtype t rule.var.ty cs in
+
+  Log.info begin fun m ->
+    m ~header:"Constraints" "%a" pp_constraits cs
+  end;
+
+  cs
+
+let rec infer_hes ?(track=false) (hes: hes) env (accum: (refinement, refinement) chc list): (refinement, refinement) chc list = match hes with
+  | [] -> accum
   | rule::xs ->
-    infer_rule track rule env accum_constraints |> infer_hes ~track:track xs env
+    infer_rule track rule env accum |> infer_hes ~track:track xs env
 
-let rec print_hes = function
-  | [] -> ()
-  | hes_rule::xs ->
-    print_string hes_rule.var.name;
-    print_string " ";
-    print_rtype hes_rule.var.ty;
-    print_newline ();
-    print_hes xs
+let pp_env ppf env =
+  let env = IdMap.to_alist env in
+  let pp_v ppf (id, ty) = Fmt.pf ppf "%s: %a" id.Id.name pp_rtype ty in
+  Fmt.pf ppf "@[<v>%a@.@]" (Fmt.list pp_v) env
+
+
+let print_env env =
+  pp_env Fmt.stdout env;
+  Fmt.flush Fmt.stdout ()
 
 let rec dnf_size = function
   | [] -> 0
@@ -207,7 +209,8 @@ let rec dnf_size = function
 
 let simplify = normalize
 
-let print_derived_refinement_type is_dual_chc hes constraints =
+
+let print_derived_refinement_type is_dual_chc (env : Rtype.t IdMap.t)  constraints =
   let rec gen_name_type_map constraints m = match constraints with
     | [] -> m
     | (id, args, body)::xs ->
@@ -215,8 +218,9 @@ let print_derived_refinement_type is_dual_chc hes constraints =
   in
   let m =
     gen_name_type_map constraints Rid.M.empty
-    |> Rid.M.map (fun (args, fml) -> args, if is_dual_chc then Rtype.dual fml else fml) in
-   let rec subst_ids map t =
+    |> Rid.M.map (fun (args, fml) -> args, if is_dual_chc then Rtype.dual fml else fml)
+  in
+  let rec subst_ids map t =
     match map with
     | [] -> t
     | (src, dst):: xs ->
@@ -236,15 +240,7 @@ let print_derived_refinement_type is_dual_chc hes constraints =
       RBool(body')
     | x -> x
   in
-  let rec inner =
-    let open Rhflz in
-    function
-    | [] -> []
-    | rule::hes ->
-      let rule = {rule with var={rule.var with ty=translate_ty rule.var.ty}} in
-      rule :: inner hes
-  in
-  inner hes
+  IdMap.map env ~f:translate_ty
 
 (* Algorithm
 Input: hes(simply typed) env top
@@ -296,7 +292,9 @@ let infer hes env top =
     | `Unknown -> `Unknown
   and infer_main ?(size=1) hes env top =
     (* 1. generate constraints *)
-    print_hes hes;
+    Log.info begin fun m ->
+    m ~header:"Initial types" "%a" pp_env env
+    end;
     let top_pred = get_top @@ Rethfl_syntax.Id.(top.ty) in
     let constraints = infer_hes hes env [{head=RTemplate(top_pred); body=RTrue}] in
     (*print_constraints constraints;*)
@@ -307,18 +305,22 @@ let infer hes env top =
 
     let simplified = simplify constraints in
     let size = dnf_size simplified in
-    Printf.printf "[Size] %d\n" size;
+    Log.info begin fun m ->
+    m ~header:"Size of constraints" "%d" size
+    end;
 
     if size > 1 then begin
       (* この辺使ってなさそう、size<=1っぽい *)
       let dual = List.map Chc.dual constraints in
       let simplified_dual = simplify dual in
       let size_dual = dnf_size simplified_dual in
-      Printf.printf "[Dual Size] %d\n" size_dual;
       let min_size = if size < size_dual then size else size_dual in
       let target = if size < size_dual then simplified else simplified_dual in
       let use_dual = size >= size_dual in
-
+      Log.info begin fun m ->
+        m ~header:"Use dual?"
+        "Using the %s CHC because the size of the dual formula is %d" (if use_dual then "dual" else "original") size_dual
+      end;
       (* let target' = expand target in
       print_string "remove or or\n";
       print_constraints target'; *)
@@ -329,7 +331,7 @@ let infer hes env top =
       | _ ->
         begin *)
           if min_size > 1 then (print_string "[Warning]Some definite clause has or-head\n";flush stdout)
-          else (print_string "easy\n"; flush stdout);
+          else ();
           if min_size > 1 then
             (* if size > 1 /\ dual_size > 1 *)
             use_dual, call_solver_with_timer target Chc_solver.(`Fptprove)
@@ -347,9 +349,12 @@ let infer hes env top =
         match x with
         | Ok(x) ->
           let open Rethfl_options in
-          let hes = print_derived_refinement_type is_dual_chc hes x in
+          let env = print_derived_refinement_type is_dual_chc env x in
           if !Typing.show_refinement then
-            print_hes hes
+            begin
+            print_string "Refinement types:\n";
+            print_env env
+            end
           else
             ()
         | Error(s) -> Printf.printf "%s\n" s
@@ -360,27 +365,6 @@ let infer hes env top =
   | `Unknown -> `Unknown
 
 
-let print_refinements (constraints: (int * [> `Int ] Id.t list * refinement) list) =
-  print_endline "[Refinements]";
-  List.iter (fun (i, ids, ref) -> (
-    Printf.printf "[constraint %d]\n%s\n" i ([%derive.show: [> `Int ] Id.t list] ids);
-    (* List.iter (fun x -> Printf.printf "%s " (Id.show  x)) ids; *)
-    print_refinement ref;
-    print_newline ();
-    ()
-  )) constraints;
-  print_endline "[Refinements end]"
-
-
-let print_env (env: Rtype.t IdMap.t) =
-  print_string "[print_env:start]\n";
-  Rethfl_syntax.IdMap.iteri env ~f:(fun ~key:key ~data:data -> (
-    Printf.printf "%s[ID=%d]: " key.name key.id;
-    print_rtype data;
-    print_newline ()
-  ));
-  print_string "[print_env:end]\n"
-
 type annotation_config = {
   annotated_func: string;
   annotated_type: Rtype.t; [@opaque]
@@ -388,14 +372,6 @@ type annotation_config = {
   dependencies_toplevel: string list;
 }
 [@@deriving show]
-
-
-let rec string_of_rty_skeleton (rty: Rtype.t) =
-    match rty with
-    | RArrow(x, y) -> "RArrow("^ (string_of_rty_skeleton x)^", "^( string_of_rty_skeleton y)^")"
-    | RBool(_) -> "RBool(RTrue)"
-    | RInt(_) -> "RInt(RId Rethfl_syntax.Id.(gen ~name:\"x\" `Int))"
-
 
 let dependent_funs f (hes : Rhflz.hes) =
   let fvs f =
@@ -450,34 +426,26 @@ let annotation_of file hes =
 let infer_based_on_annotations hes (env: Rtype.t IdMap.t) top file =
   let annotation = annotation_of file hes in
 
-  print_env env;
-
   let env = Rethfl_syntax.IdMap.mapi env ~f:(fun ~key:id ~data:rty -> (
-    if id.name = annotation.annotated_func
+    if id.Id.name = annotation.annotated_func
         then annotation.annotated_type
         else rty
   )) in
 
-  print_env env;
-
   let hes = List.filter (fun x -> x.var.name <> annotation.annotated_func && List.exists (fun s -> s = x.var.name) annotation.dependencies_toplevel) hes in
-  print_hes hes;
-  infer hes env top 
-  
+
+  infer hes env top
+
 
 let check_annotation hes env file =
   let annotation = annotation_of file hes in
 
-  print_env env;
-
   (* replace the types in the type environment by the given annotation *)
   let env = Rethfl_syntax.IdMap.mapi env ~f:(fun ~key:id ~data:rty -> (
-    if id.name = annotation.annotated_func
+    if id.Id.name = annotation.annotated_func
         then annotation.annotated_type
         else rty
   )) in
-
-  print_env env;
 
   (* get the annotated function  *)
   let top = (List.find (fun x -> x.var.name = annotation.annotated_func) hes).var in
