@@ -7,6 +7,10 @@ module Unix = Core_unix
 
 type solver = [`Spacer | `Hoice | `Fptprove | `Eldarica | `Liu]
 
+let log_src = Logs.Src.create ~doc:"Log for the CHC solver module" "CHC Solver"
+module Log = (val Logs.src_log log_src)
+
+
 let fptprove_path_env = "fptprove"
 
 type unsat_proof_node =
@@ -267,7 +271,7 @@ let parse_model model =
       | (name, args, x)::xs -> (name, args, simplify_def x) :: inner xs
     in inner defs
   in
-  print_string model;
+  Log.info (fun m -> m ~header: "Model" "%s" model);
   match Sexplib.Sexp.parse model with
   | Done(model, _) -> begin
     match model with
