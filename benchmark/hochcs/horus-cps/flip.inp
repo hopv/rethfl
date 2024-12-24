@@ -1,8 +1,0 @@
-environment
-dummy : bool
-;
-program
-true => dummy
-;
-goal
-∃v1,v2:int. (((v2 - v2) = (v2 - v1)) ∧ false) ∨ (((v2 - v2) != (v2 - v1)) ∧ true)

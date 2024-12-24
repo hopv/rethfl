@@ -1,8 +1,0 @@
-environment
-dummy : bool
-;
-program
-true => dummy
-;
-goal
-∃:int. false

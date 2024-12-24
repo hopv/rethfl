@@ -1,1 +1,0 @@
-{"filename":"/home/katsura/hflmc2/benchmark/ml/test_safe_2019/adt/combine_difficult.ml","result":"Safe","cycles":6,"total":56.686176,"pre":0.026839000000000002,"abst":49.412409,"mc":0.8829870000000157,"refine":6.054169999999992}

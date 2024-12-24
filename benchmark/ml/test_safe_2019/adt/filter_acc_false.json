@@ -1,1 +1,0 @@
-{"filename":"/home/katsura/hflmc2/benchmark/ml/test_safe_2019/adt/filter_acc_false.ml","result":"Failure(\"undefined enum value\")","cycles":4,"total":9.158303,"pre":0.016529999999999996,"abst":5.778606,"mc":0.05160000000000098,"refine":3.2391530000000017}
