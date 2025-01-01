@@ -3,14 +3,20 @@ open Rtype
 
 type ('head, 'body) chc = {head: 'head; body: 'body}
 
-let print_chc chc = 
-  print_refinement chc.body;
-  Printf.printf " => ";
-  print_refinement chc.head
+let pp_chc ppf chc =
+  (* Maybe head <= body is better ?*)
+  Fmt.pf ppf "@[<2>%a =>@ %a@]" pp_refinement chc.body pp_refinement chc.head
 
-let rec print_constraints = function
-  | [] -> ()
-  | x::xs -> print_chc x; print_newline(); print_constraints xs
+let print_chc chc = 
+  pp_chc Fmt.stdout chc;
+  Fmt.flush Fmt.stdout ()
+
+let pp_constraits ppf chcs =
+    Fmt.pf ppf "@[<v>%a@,@]" (Fmt.list pp_chc) chcs
+
+let print_constraints chcs =
+  pp_constraits Fmt.stdout chcs;
+  Fmt.flush Fmt.stdout ()
 
 (* find x=e in the toplevel of CHC's body, and then replace it by True *)
 let rec find_and_cut_substs rt ids = match rt with 

@@ -49,15 +49,15 @@ let report_times () =
 
 let main file =
   let psi, _ = Syntax.parse_file file in
-  Log.app begin fun m -> m ~header:"Input" "%a"
+  Log.info begin fun m -> m ~header:"Input" "%a"
     Print.(hflz_hes simple_ty_) psi
   end;
   let psi = Syntax.Trans.Simplify.hflz_hes psi in
-  Log.app begin fun m -> m ~header:"Simplified" "%a"
+  Log.info begin fun m -> m ~header:"Simplified" "%a"
     Print.(hflz_hes simple_ty_) psi
   end;
   let psi = Syntax.Trans.Peephole.hflz_hes psi in
-  Log.app begin fun m -> m ~header:"Peephole" "%a"
+  Log.info begin fun m -> m ~header:"Peephole" "%a"
     Print.(hflz_hes simple_ty_) psi
   end;
   let psi, top = Syntax.Trans.Preprocess.main psi in
@@ -69,7 +69,7 @@ let main file =
       begin
       (* remove disjunction *)
         let psi = Syntax.Trans.RemoveDisjunction.f psi top in
-        Log.app begin fun m -> m ~header:"RemoveDisj" "%a"
+        Log.info begin fun m -> m ~header:"RemoveDisj" "%a"
           Print.(hflz_hes simple_ty_) psi
         end;
         psi
