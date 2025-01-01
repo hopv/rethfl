@@ -3,6 +3,8 @@ open Rid
 open Rresult
 
 
+let log_src = Logs.Src.create ~doc:"Debug log for refinemnet types" "RType"
+module Log = (val Logs.src_log log_src)
 
 let id_source = ref 0
 let id_top = 0
@@ -48,10 +50,12 @@ let generate_rtemplate args = RTemplate(generate_id(), args)
 (* clone *)
 let rec clone_type_with_new_pred ints = function
   | RBool(RTemplate(_, _)) -> RBool(RTemplate(generate_id (), ints))
-  | RBool(_) -> begin
-      print_endline "[Info]: Replacing non-template refinement";
+  | RBool(_) ->
+    Log.info
+    begin fun m ->
+      m "[Info]: Replacing non-template refinement"
+    end;
       RBool(RTemplate(generate_id (), ints))
-    end
   | RArrow(RInt(RId(id)), y) ->
     RArrow(RInt(RId(id)), clone_type_with_new_pred (Arith.Var(id)::ints) y)
   | RArrow(x, y) ->
