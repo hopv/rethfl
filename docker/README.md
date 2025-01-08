@@ -4,7 +4,7 @@
 Run
 
 ``` sh
-docker buildx build . -t rethfl -f docker/Dockerfile
+docker buildx build . -t rethfl:esop25ae -f docker/Dockerfile
 ```
 at the root directory of this repository.
 Note that we use `buildx` for multiplatform support.

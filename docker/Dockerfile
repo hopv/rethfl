@@ -49,6 +49,9 @@ RUN wget https://github.com/uuverifiers/eldarica/releases/download/v${ELDARICA_V
     ln -s /usr/local/bin/eldarica/eld /usr/local/bin/eld && \
     apt install -y default-jre
 
+# Python Libraries for the benchmark script
+RUN apt install -y python3 python3-pandas python3-tqdm
+
 FROM base AS builder
 COPY ./ /root/rethfl
 WORKDIR /root/rethfl
