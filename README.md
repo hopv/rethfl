@@ -4,6 +4,8 @@
 A nuHFL(Z) (aka higher-order CHC) solver based on refinement types.
 
 ## Install and Build
+The easiest way to test ReTHFL is to use Docker (see the [README](docker/README.md) for Docker).
+Here we explain how to install ReTHFL without relying on Docker.
 
 ### Creating an opam switch
 We use [opam](https://opam.ocaml.org/) for install and build.
