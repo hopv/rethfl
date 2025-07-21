@@ -8,6 +8,10 @@
 (authors "katsura" "Hogeyama")
 (maintainers "Hiroyuki Katsura <katsura@kb.is.s.u-tokyo.ac.jp>, Ken Sakayori <sakayori@kb.is.s.u-tokyo.ac.jp>")
 
+(pin
+ (url "git+https://github.com/hammerlab/ppx_deriving_cmdliner.git#master")
+ (package (name ppx_deriving_cmdliner.dev)))
+
 (package
   (name rethfl)
   (synopsis "A nuHFLZ solver based on refinement types")

@@ -42,12 +42,3 @@ build: [
   ]
 ]
 dev-repo: "git+https://github.com/hopv/rethfl.git"
-
-# We need to pin ppx_deriving_cmdliner because new packages are not uploaded to opam
-# This template is a workaround suggested by:
-# https://discuss.ocaml.org/t/pin-depends-in-dune/8066
-# We may be able to remove this soon since pin-depends is going to be supported by dune:
-# https://github.com/ocaml/dune/issues/9487
-pin-depends: [
-  [ "ppx_deriving_cmdliner.dev" "git+https://github.com/hammerlab/ppx_deriving_cmdliner.git#master" ]
-]
