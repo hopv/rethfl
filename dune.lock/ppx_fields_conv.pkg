@@ -1,0 +1,13 @@
+(version v0.16.0)
+
+(build
+ (run dune build -p %{pkg-self:name} -j %{jobs}))
+
+(depends ocaml base fieldslib dune ppxlib)
+
+(source
+ (fetch
+  (url
+   https://ocaml.janestreet.com/ocaml-core/v0.16/files/ppx_fields_conv-v0.16.0.tar.gz)
+  (checksum
+   sha256=b098fab38b5204114623a791e7034ff1316e676ba984ca70cadb4084dfc61898)))

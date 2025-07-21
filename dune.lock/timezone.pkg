@@ -1,0 +1,13 @@
+(version v0.16.0)
+
+(build
+ (run dune build -p %{pkg-self:name} -j %{jobs}))
+
+(depends ocaml core ppx_jane dune)
+
+(source
+ (fetch
+  (url
+   https://ocaml.janestreet.com/ocaml-core/v0.16/files/timezone-v0.16.0.tar.gz)
+  (checksum
+   sha256=3eb3f044734051d4c7dce0ef49aae0e8963dcf4680768f7946583ac3f5fe87a0)))

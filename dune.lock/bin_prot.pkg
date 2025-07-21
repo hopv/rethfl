@@ -1,0 +1,23 @@
+(version v0.16.0)
+
+(build
+ (run dune build -p %{pkg-self:name} -j %{jobs}))
+
+(depends
+ ocaml
+ base
+ ppx_compare
+ ppx_custom_printf
+ ppx_fields_conv
+ ppx_optcomp
+ ppx_sexp_conv
+ ppx_stable_witness
+ ppx_variants_conv
+ dune)
+
+(source
+ (fetch
+  (url
+   https://ocaml.janestreet.com/ocaml-core/v0.16/files/bin_prot-v0.16.0.tar.gz)
+  (checksum
+   sha256=3ede8089d809186ba2bc7ade49d814c6d60e0414c2ba075807eaeb05d1d0a2f1)))

@@ -1,0 +1,13 @@
+(version v0.16.0)
+
+(build
+ (run dune build -p %{pkg-self:name} -j %{jobs}))
+
+(depends ocaml base dune ppxlib)
+
+(source
+ (fetch
+  (url
+   https://ocaml.janestreet.com/ocaml-core/v0.16/files/ppx_stable_witness-v0.16.0.tar.gz)
+  (checksum
+   sha256=4f9857612d9d65c3844bd8940b946a19472e2d5b9df29e91c829d6d0aa78c5ef)))

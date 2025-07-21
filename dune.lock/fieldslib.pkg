@@ -1,0 +1,13 @@
+(version v0.16.0)
+
+(build
+ (run dune build -p %{pkg-self:name} -j %{jobs}))
+
+(depends ocaml base dune)
+
+(source
+ (fetch
+  (url
+   https://ocaml.janestreet.com/ocaml-core/v0.16/files/fieldslib-v0.16.0.tar.gz)
+  (checksum
+   sha256=2cc5954259e71a747dfaad0e86bfe32c04dca35e83372dbcdeefb08c6059b2f1)))

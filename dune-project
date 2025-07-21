@@ -10,7 +10,7 @@
 
 (pin
  (url "git+https://github.com/hammerlab/ppx_deriving_cmdliner.git#master")
- (package (name ppx_deriving_cmdliner.dev)))
+ (package (name ppx_deriving_cmdliner)))
 
 (package
   (name rethfl)
@@ -28,7 +28,7 @@
           menhirLib
           ppx_compare
           ppx_deriving
-          (ppx_deriving_cmdliner (= "dev"))
+          ppx_deriving_cmdliner
           ppx_let
           (ppx_sexp_conv (>= v0.16))
  ))

@@ -1,0 +1,12 @@
+(version v0.16.1)
+
+(build
+ (run dune build -p %{pkg-self:name} -j %{jobs}))
+
+(depends ocaml base ppx_here ppx_inline_test stdio dune ppxlib re)
+
+(source
+ (fetch
+  (url
+   https://github.com/janestreet/ppx_expect/archive/refs/tags/v0.16.1.tar.gz)
+  (checksum md5=f2db0b9091a532f2f67a2bf0b8d8b268)))

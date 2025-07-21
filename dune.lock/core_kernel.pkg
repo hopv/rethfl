@@ -1,0 +1,13 @@
+(version v0.16.0)
+
+(build
+ (run dune build -p %{pkg-self:name} -j %{jobs}))
+
+(depends ocaml base core int_repr ppx_jane ppx_optcomp base-threads dune)
+
+(source
+ (fetch
+  (url
+   https://ocaml.janestreet.com/ocaml-core/v0.16/files/core_kernel-v0.16.0.tar.gz)
+  (checksum
+   sha256=e37370bad978cfb71fdaf2b1a25ab1506b98ef0b91e0dbd189ffd9d853245ce2)))

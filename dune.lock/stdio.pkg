@@ -1,0 +1,13 @@
+(version v0.16.0)
+
+(build
+ (run dune build -p %{pkg-self:name} -j %{jobs}))
+
+(depends ocaml base dune)
+
+(source
+ (fetch
+  (url
+   https://ocaml.janestreet.com/ocaml-core/v0.16/files/stdio-v0.16.0.tar.gz)
+  (checksum
+   sha256=61f0b75950614ac5378c6ec0d822cce6463402d919d5810b736fc46522b3a73e)))

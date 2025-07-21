@@ -1,0 +1,23 @@
+(version v0.16.0)
+
+(build
+ (run dune build -p %{pkg-self:name} -j %{jobs}))
+
+(depends
+ ocaml
+ base
+ ppx_base
+ ppx_fields_conv
+ ppx_let
+ ppx_sexp_message
+ ppx_sexp_value
+ splittable_random
+ dune
+ ppxlib)
+
+(source
+ (fetch
+  (url
+   https://ocaml.janestreet.com/ocaml-core/v0.16/files/base_quickcheck-v0.16.0.tar.gz)
+  (checksum
+   sha256=88f80a75d224ceed33d0f891e6bb931979ec24397871b3347b8be22ef96d2e7e)))

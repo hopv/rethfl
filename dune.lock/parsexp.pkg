@@ -1,0 +1,13 @@
+(version v0.16.0)
+
+(build
+ (run dune build -p %{pkg-self:name} -j %{jobs}))
+
+(depends ocaml sexplib0 dune)
+
+(source
+ (fetch
+  (url
+   https://ocaml.janestreet.com/ocaml-core/v0.16/files/parsexp-v0.16.0.tar.gz)
+  (checksum
+   sha256=b6e2572c8e6191a85cb8f9c3276ed87fe00522c81ba7a268179fb08185e55e12)))

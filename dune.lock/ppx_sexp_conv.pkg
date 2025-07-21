@@ -1,0 +1,13 @@
+(version v0.16.0)
+
+(build
+ (run dune build -p %{pkg-self:name} -j %{jobs}))
+
+(depends ocaml base sexplib0 dune ppxlib)
+
+(source
+ (fetch
+  (url
+   https://ocaml.janestreet.com/ocaml-core/v0.16/files/ppx_sexp_conv-v0.16.0.tar.gz)
+  (checksum
+   sha256=41bcb7a3b33bdf50428408bfaf1dbcede528a488ac8c436ce710681bcd91200d)))

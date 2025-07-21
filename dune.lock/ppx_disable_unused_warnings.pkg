@@ -1,0 +1,13 @@
+(version v0.16.0)
+
+(build
+ (run dune build -p %{pkg-self:name} -j %{jobs}))
+
+(depends ocaml base dune ppxlib)
+
+(source
+ (fetch
+  (url
+   https://ocaml.janestreet.com/ocaml-core/v0.16/files/ppx_disable_unused_warnings-v0.16.0.tar.gz)
+  (checksum
+   sha256=3fd18ff840e4f84eb34683efdd56508ba330011b8f906d0f60684f8fce4298e7)))

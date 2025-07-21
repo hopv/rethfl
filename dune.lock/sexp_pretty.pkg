@@ -1,0 +1,13 @@
+(version v0.16.0)
+
+(build
+ (run dune build -p %{pkg-self:name} -j %{jobs}))
+
+(depends ocaml base ppx_base sexplib dune re)
+
+(source
+ (fetch
+  (url
+   https://ocaml.janestreet.com/ocaml-core/v0.16/files/sexp_pretty-v0.16.0.tar.gz)
+  (checksum
+   sha256=0502ffec75e097967e8745b98f65b6ce3b4cd4b64e569d67fe052ab90851ea60)))

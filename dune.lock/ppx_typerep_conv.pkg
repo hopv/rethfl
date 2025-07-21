@@ -1,0 +1,13 @@
+(version v0.16.0)
+
+(build
+ (run dune build -p %{pkg-self:name} -j %{jobs}))
+
+(depends ocaml base typerep dune ppxlib)
+
+(source
+ (fetch
+  (url
+   https://ocaml.janestreet.com/ocaml-core/v0.16/files/ppx_typerep_conv-v0.16.0.tar.gz)
+  (checksum
+   sha256=ffd565ee7b30dbb9c57e38c0cda8b33b4153edb3adae05796e0f97a7780f0d9a)))

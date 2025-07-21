@@ -1,0 +1,16 @@
+(version dev)
+
+(build
+ (progn
+  (when
+   %{pkg-self:dev}
+   (run dune subst))
+  (run dune build -p %{pkg-self:name} -j %{jobs})))
+
+(depends ocaml cmdliner result ppx_deriving dune ppxlib)
+
+(source
+ (fetch
+  (url git+https://github.com/hammerlab/ppx_deriving_cmdliner.git#master)))
+
+(dev)

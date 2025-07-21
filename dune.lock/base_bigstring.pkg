@@ -1,0 +1,13 @@
+(version v0.16.0)
+
+(build
+ (run dune build -p %{pkg-self:name} -j %{jobs}))
+
+(depends ocaml base int_repr ppx_jane dune)
+
+(source
+ (fetch
+  (url
+   https://ocaml.janestreet.com/ocaml-core/v0.16/files/base_bigstring-v0.16.0.tar.gz)
+  (checksum
+   sha256=19fcbf8fa1fa557d513679413a9087e4ff1cb846cef1e8a78eaffb293fa926c3)))

@@ -1,0 +1,13 @@
+(version v0.16.0)
+
+(build
+ (run dune build -p %{pkg-self:name} -j %{jobs}))
+
+(depends ocaml base dune ppxlib)
+
+(source
+ (fetch
+  (url
+   https://ocaml.janestreet.com/ocaml-core/v0.16/files/ppx_globalize-v0.16.0.tar.gz)
+  (checksum
+   sha256=9068d7b4b765112974b17dd354cadf007f044afb11d2f99cd45b2e3b99ab491b)))

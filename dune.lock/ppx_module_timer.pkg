@@ -1,0 +1,13 @@
+(version v0.16.0)
+
+(build
+ (run dune build -p %{pkg-self:name} -j %{jobs}))
+
+(depends ocaml base ppx_base stdio time_now dune ppxlib)
+
+(source
+ (fetch
+  (url
+   https://ocaml.janestreet.com/ocaml-core/v0.16/files/ppx_module_timer-v0.16.0.tar.gz)
+  (checksum
+   sha256=2aee6ebec3dc3378a88a245a2c4f7c6314e96c377a02f390622c125bcef41f74)))

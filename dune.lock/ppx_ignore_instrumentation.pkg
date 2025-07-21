@@ -1,0 +1,13 @@
+(version v0.16.0)
+
+(build
+ (run dune build -p %{pkg-self:name} -j %{jobs}))
+
+(depends ocaml dune ppxlib)
+
+(source
+ (fetch
+  (url
+   https://ocaml.janestreet.com/ocaml-core/v0.16/files/ppx_ignore_instrumentation-v0.16.0.tar.gz)
+  (checksum
+   sha256=522f50ef213300812658b5ea260299c072c24130502bde7e4f74eeda4c709305)))

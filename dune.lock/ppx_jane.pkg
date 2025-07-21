@@ -1,0 +1,42 @@
+(version v0.16.0)
+
+(build
+ (run dune build -p %{pkg-self:name} -j %{jobs}))
+
+(depends
+ ocaml
+ base_quickcheck
+ ppx_assert
+ ppx_base
+ ppx_bench
+ ppx_bin_prot
+ ppx_custom_printf
+ ppx_disable_unused_warnings
+ ppx_expect
+ ppx_fields_conv
+ ppx_fixed_literal
+ ppx_here
+ ppx_ignore_instrumentation
+ ppx_inline_test
+ ppx_let
+ ppx_log
+ ppx_module_timer
+ ppx_optional
+ ppx_pipebang
+ ppx_sexp_message
+ ppx_sexp_value
+ ppx_stable
+ ppx_stable_witness
+ ppx_string
+ ppx_tydi
+ ppx_typerep_conv
+ ppx_variants_conv
+ dune
+ ppxlib)
+
+(source
+ (fetch
+  (url
+   https://ocaml.janestreet.com/ocaml-core/v0.16/files/ppx_jane-v0.16.0.tar.gz)
+  (checksum
+   sha256=9d53b01dd2e38bbe82b6927f43fa27e347418045409fd2cd3e2a203a9951c133)))

@@ -1,0 +1,13 @@
+(version v0.16.0)
+
+(build
+ (run dune build -p %{pkg-self:name} -j %{jobs}))
+
+(depends ocaml base dune)
+
+(source
+ (fetch
+  (url
+   https://ocaml.janestreet.com/ocaml-core/v0.16/files/typerep-v0.16.0.tar.gz)
+  (checksum
+   sha256=e5157fef61e0229dacf01a5677bb93416ab59ee86046904c3d691e872ed4f72c)))

@@ -1,0 +1,13 @@
+(version v0.16.0)
+
+(build
+ (run dune build -p %{pkg-self:name} -j %{jobs}))
+
+(depends ocaml dune ppxlib)
+
+(source
+ (fetch
+  (url
+   https://ocaml.janestreet.com/ocaml-core/v0.16/files/ppx_pipebang-v0.16.0.tar.gz)
+  (checksum
+   sha256=b9e447e49cdbc55fb0f66401ed0d7b6522fbec6518a43f7a4905af67e41efa66)))

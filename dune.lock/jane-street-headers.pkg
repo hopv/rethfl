@@ -1,0 +1,13 @@
+(version v0.16.0)
+
+(build
+ (run dune build -p %{pkg-self:name} -j %{jobs}))
+
+(depends ocaml dune)
+
+(source
+ (fetch
+  (url
+   https://ocaml.janestreet.com/ocaml-core/v0.16/files/jane-street-headers-v0.16.0.tar.gz)
+  (checksum
+   sha256=876d409feeb495487b10010fb601c64829d2aa15f1b156b704ec141337d360ea)))

@@ -1,0 +1,13 @@
+(version v0.16.0)
+
+(build
+ (run dune build -p %{pkg-self:name} -j %{jobs}))
+
+(depends ocaml base ppx_cold ppx_compare ppx_here ppx_sexp_conv dune ppxlib)
+
+(source
+ (fetch
+  (url
+   https://ocaml.janestreet.com/ocaml-core/v0.16/files/ppx_assert-v0.16.0.tar.gz)
+  (checksum
+   sha256=57dc6e241827eb1d5112c958f2f682ddd0addf5a8e9d589f5361ec2669883fd5)))

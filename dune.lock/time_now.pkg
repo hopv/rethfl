@@ -1,0 +1,13 @@
+(version v0.16.0)
+
+(build
+ (run dune build -p %{pkg-self:name} -j %{jobs}))
+
+(depends ocaml base jane-street-headers jst-config ppx_base ppx_optcomp dune)
+
+(source
+ (fetch
+  (url
+   https://ocaml.janestreet.com/ocaml-core/v0.16/files/time_now-v0.16.0.tar.gz)
+  (checksum
+   sha256=5fa084aadee6aaedbb8976e4a2bc0c1dfe69eecdd0576ff901f21eedd46dc3a1)))

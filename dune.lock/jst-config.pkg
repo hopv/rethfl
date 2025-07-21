@@ -1,0 +1,13 @@
+(version v0.16.0)
+
+(build
+ (run dune build -p %{pkg-self:name} -j %{jobs}))
+
+(depends ocaml base ppx_assert dune dune-configurator)
+
+(source
+ (fetch
+  (url
+   https://ocaml.janestreet.com/ocaml-core/v0.16/files/jst-config-v0.16.0.tar.gz)
+  (checksum
+   sha256=faead56d8582868cdc099ad54f9bae059cc48710b724600cc64013e73c14d95b)))
