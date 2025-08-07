@@ -7,6 +7,9 @@ let false_id = -1
 
 let eq x y = x = y
 
+(* This function is used by ppx-deriving eq *)
+let equal_id = eq
+
 let print_id = print_int
 
 let to_string id = Printf.sprintf "X%d" id

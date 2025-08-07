@@ -240,7 +240,16 @@ let print_derived_refinement_type is_dual_chc (env : Rtype.t IdMap.t)  constrain
       RBool(body')
     | x -> x
   in
-  IdMap.map env ~f:translate_ty
+ (* Repeats substituting predicate variable with its solution until we reach a fixed point  *)
+ (* We need to repeat this because some solvers do not inline the solutions *)
+  let rec iter_trans ?(max_repeat=1000) env =
+    if max_repeat < 0 then failwith "program error(iter_trans may be in an infinite loop)"
+    else
+    let env' = IdMap.map env ~f:translate_ty in
+    if IdMap.equal (Rtype.equal) env env' then env
+    else iter_trans env' ~max_repeat:(max_repeat - 1)
+  in
+  iter_trans env
 
 (* Algorithm
 Input: hes(simply typed) env top

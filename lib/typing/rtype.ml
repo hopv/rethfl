@@ -32,10 +32,14 @@ let print_template t =
 type rint =
   | RId of [`Int] Id.t
   | RArith of Arith.t
+[@@deriving eq]
+
 and t
   = RBool of refinement
   | RArrow of t * t
   | RInt of rint
+[@@deriving eq]
+
 and refinement
   = RTrue
    | RFalse
@@ -43,7 +47,10 @@ and refinement
    | RAnd of refinement * refinement
    | ROr of refinement * refinement
    | RTemplate of template
+[@@deriving eq]
+
 and template = id * Arith.t list (* template prdicate name and its args *)
+[@@deriving eq]
 
 let generate_rtemplate args = RTemplate(generate_id(), args)
 
