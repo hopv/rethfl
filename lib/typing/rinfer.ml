@@ -210,7 +210,7 @@ let rec dnf_size = function
 let simplify = normalize
 
 
-let print_derived_refinement_type is_dual_chc (env : Rtype.t IdMap.t)  constraints =
+let get_derived_refinement_type is_dual_chc (env : Rtype.t IdMap.t)  constraints =
   let rec gen_name_type_map constraints m = match constraints with
     | [] -> m
     | (id, args, body)::xs ->
@@ -228,16 +228,22 @@ let print_derived_refinement_type is_dual_chc (env : Rtype.t IdMap.t)  constrain
   in
   let rec zip l r = match (l, r) with
     | [], [] -> []
-    | [], _ | _ , [] -> failwith "program error(print_derived_refinement_type)"
+    | [], _ | _ , [] -> failwith "program error(get_derived_refinement_type)"
     | x::xs, y::ys -> (x, y)::zip xs ys
+  in
+  let rec translate_refinement = function
+      | RTemplate(p, l) ->
+        let (args, body) = Rid.M.find p m in
+        let map = zip args l in
+        let body' = subst_ids map body in
+        body'
+      | RAnd(r1, r2) -> RAnd(translate_refinement r1, translate_refinement r2)
+      | ROr(r1, r2) -> RAnd(translate_refinement r1, translate_refinement r2)
+      | x -> x
   in
   let rec translate_ty = function
     | RArrow (x, y) -> RArrow(translate_ty x, translate_ty y)
-    | RBool(RTemplate(p, l)) ->
-      let (args, body) = Rid.M.find p m in
-      let map = zip args l in
-      let body' = subst_ids map body in
-      RBool(body')
+    | RBool(r) -> RBool(translate_refinement r)
     | x -> x
   in
  (* Repeats substituting predicate variable with its solution until we reach a fixed point  *)
@@ -358,7 +364,7 @@ let infer hes env top =
         match x with
         | Ok(x) ->
           let open Rethfl_options in
-          let env = print_derived_refinement_type is_dual_chc env x in
+          let env = get_derived_refinement_type is_dual_chc env x in
           if !Typing.show_refinement then
             begin
             print_string "Refinement types:\n";
