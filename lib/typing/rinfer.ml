@@ -238,7 +238,7 @@ let get_derived_refinement_type is_dual_chc (env : Rtype.t IdMap.t)  constraints
         let body' = subst_ids map body in
         body'
       | RAnd(r1, r2) -> RAnd(translate_refinement r1, translate_refinement r2)
-      | ROr(r1, r2) -> RAnd(translate_refinement r1, translate_refinement r2)
+      | ROr(r1, r2) -> ROr(translate_refinement r1, translate_refinement r2)
       | x -> x
   in
   let rec translate_ty = function
